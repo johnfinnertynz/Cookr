@@ -639,6 +639,15 @@ select {
   color: var(--text-h);
 }
 
+input[type='checkbox'] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: var(--green);
+}
+
 .bottom-nav {
   display: none;
 }
