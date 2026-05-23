@@ -39,6 +39,13 @@ npm run build
 npm run lint
 ```
 
+Smoke test after starting the dev server:
+
+```bash
+npm run dev -- --host 127.0.0.1 --port 5173
+npm run qa:smoke
+```
+
 ## Important Files
 - `src/App.tsx`: complete MVP app shell and views.
 - `src/data/recipes.ts`: seed recipe catalogue.
@@ -49,6 +56,8 @@ npm run lint
 - `docs/UX_FLOW.md`: user flow.
 - `docs/ARCHITECTURE.md`: technical architecture.
 - `docs/PRODUCTION_ARCHITECTURE.md`: scalable startup architecture, APIs, recommendation engine, ingestion, caching, security, and roadmap.
+- `docs/PRODUCTION_READINESS_AUDIT.md`: production-readiness findings, fixes, residual risk, and launch scores.
+- `docs/APP_STORE_READINESS.md`: app store metadata, screenshots plan, privacy/terms draft, and beta checklist.
 - `docs/schema.sql`: Supabase-ready schema.
 - `docs/schema.production.sql`: production-oriented normalized Supabase/Postgres schema.
 - `docs/TESTING_CHECKLIST.md`: QA checklist.

@@ -1,0 +1,19 @@
+{
+  "name": "Cookr",
+  "short_name": "Cookr",
+  "description": "Low-effort guided cooking for New Zealanders replacing takeaways.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7faf7",
+  "theme_color": "#238b5a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["food", "lifestyle", "health"]
+}

@@ -1,19 +1,14 @@
 import { fallbackProductMatch, productMatches } from '../data/products'
+import { formatQuantity, normalizeIngredientName, normalizeIngredientQuantity, parseOwnedItems } from './ingredients'
 import type { GroceryLine, Ingredient, Recipe } from '../types'
 
-const roundQuantity = (value: number) => {
-  if (Number.isInteger(value)) return String(value)
-  return value.toFixed(1).replace('.0', '')
+const makeKey = (ingredient: Ingredient) => {
+  const normalized = normalizeIngredientQuantity(ingredient)
+  return `${normalizeIngredientName(ingredient)}-${normalized.unit}`
 }
 
-const makeKey = (ingredient: Ingredient) => `${ingredient.name.toLowerCase()}-${ingredient.unit}`
-
 export const buildGroceryList = (selectedRecipes: Recipe[], ownedItems: string): GroceryLine[] => {
-  const owned = ownedItems
-    .toLowerCase()
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const owned = parseOwnedItems(ownedItems)
 
   const lines = new Map<string, GroceryLine>()
 
@@ -21,23 +16,30 @@ export const buildGroceryList = (selectedRecipes: Recipe[], ownedItems: string):
     recipe.ingredients.forEach((ingredient) => {
       const key = makeKey(ingredient)
       const existing = lines.get(key)
-      const checked = owned.some((item) => ingredient.name.includes(item)) || Boolean(ingredient.pantry)
+      const canonicalName = normalizeIngredientName(ingredient)
+      const normalized = normalizeIngredientQuantity(ingredient)
+      const checked = owned.some((item) => canonicalName.includes(item) || item.includes(canonicalName)) || Boolean(ingredient.pantry)
       const match = ingredient.productKey
         ? productMatches[ingredient.productKey] ?? fallbackProductMatch(ingredient.name)
         : fallbackProductMatch(ingredient.name)
 
       if (existing) {
-        existing.quantity += ingredient.quantity
-        existing.displayQuantity = `${roundQuantity(existing.quantity)} ${existing.unit}`
+        existing.normalizedQuantity += normalized.quantity
+        existing.quantity = existing.normalizedQuantity
+        existing.displayQuantity = formatQuantity(existing.normalizedQuantity, existing.normalizedUnit)
         existing.recipeIds.push(recipe.id)
         existing.checked = existing.checked || checked
       } else {
         lines.set(key, {
           ...ingredient,
-          displayQuantity: `${roundQuantity(ingredient.quantity)} ${ingredient.unit}`,
+          name: canonicalName,
+          displayQuantity: formatQuantity(normalized.quantity, normalized.unit),
           recipeIds: [recipe.id],
           checked,
           match,
+          normalizedQuantity: normalized.quantity,
+          normalizedUnit: normalized.unit,
+          confidenceNote: normalized.confidenceNote,
         })
       }
     })

@@ -32,3 +32,4 @@
 ## Build
 - Run `npm run build`.
 - Run `npm run lint`.
+- Run `npm run qa:smoke` with the dev server running at `http://127.0.0.1:5173`.

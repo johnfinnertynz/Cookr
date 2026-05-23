@@ -12,6 +12,7 @@ select {
 
 button {
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .panel {
@@ -19,6 +20,21 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.status-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  background: var(--tomato-soft);
+  color: var(--text-h);
+  font-size: 0.92rem;
+  font-weight: 800;
 }
 
 .topbar {
@@ -29,7 +45,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 24px;
+  padding: calc(14px + env(safe-area-inset-top)) 24px 14px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(18px);
@@ -107,7 +123,61 @@ button {
 main {
   width: min(1160px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 24px 0 104px;
+  padding: 24px 0 calc(104px + env(safe-area-inset-bottom));
+}
+
+.mode-strip {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mode-card {
+  min-height: 96px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.mode-card:hover,
+.recipe-card:hover {
+  transform: translateY(-1px);
+}
+
+.mode-card svg {
+  color: var(--green);
+}
+
+.mode-card span {
+  color: var(--text-h);
+  font-weight: 900;
+}
+
+.mode-card small {
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.active-mode {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green-soft) 84%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--green);
 }
 
 .hero-band {
@@ -132,8 +202,8 @@ h3 {
 h1 {
   max-width: 680px;
   margin: 0 0 14px;
-  font-size: clamp(2.4rem, 5vw, 5rem);
-  line-height: 0.96;
+  font-size: clamp(2.25rem, 4.6vw, 4.6rem);
+  line-height: 1;
 }
 
 h2 {
@@ -209,6 +279,22 @@ p {
   font-weight: 700;
 }
 
+.plan-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-stats span {
+  padding: 9px;
+  border-radius: 7px;
+  background: var(--soft);
+  color: var(--text-h);
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-align: center;
+}
+
 .meal-row span,
 .section-label,
 .card-topline span,
@@ -246,6 +332,15 @@ p {
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--muted);
+  background: var(--surface);
+}
+
+.search-box input {
+  min-height: 38px;
+  min-width: 220px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .filter-drawer,
@@ -283,6 +378,10 @@ p {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .recipe-card img,
@@ -291,6 +390,16 @@ p {
   aspect-ratio: 4 / 3;
   object-fit: cover;
   display: block;
+}
+
+.image-button {
+  width: 100%;
+  display: block;
+  padding: 0 !important;
+  border: 0;
+  background: transparent !important;
+  border-radius: 0 !important;
+  overflow: hidden;
 }
 
 .recipe-body {
@@ -321,6 +430,22 @@ p {
 .helper-copy {
   color: var(--muted);
   font-size: 0.94rem;
+}
+
+.effort-meter {
+  display: flex;
+  gap: 4px;
+}
+
+.effort-meter span {
+  width: 22px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.effort-meter .filled {
+  background: var(--green);
 }
 
 .card-actions {
@@ -354,6 +479,34 @@ p {
   gap: 14px;
 }
 
+.beginner-callout,
+.fallback-strip,
+.visual-cue {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--text-h);
+}
+
+.fallback-strip {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.fallback-strip p {
+  color: var(--muted);
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .detail-stats {
   gap: 8px;
   flex-wrap: wrap;
@@ -378,6 +531,18 @@ p {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.empty-state {
+  margin: 18px 0;
+  padding: 28px;
+  display: grid;
+  place-items: start;
+  gap: 12px;
+}
+
+.empty-state svg {
+  color: var(--green);
 }
 
 .ingredient-list li {
@@ -420,6 +585,15 @@ p {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.aisle-group {
+  display: grid;
+  gap: 8px;
+}
+
+.aisle-group h3 {
+  padding-top: 10px;
 }
 
 .grocery-row label {
@@ -486,6 +660,16 @@ p {
   gap: 14px;
 }
 
+.visual-cue {
+  display: grid;
+  gap: 3px;
+  background: color-mix(in srgb, var(--surface) 64%, var(--green-soft));
+}
+
+.visual-cue span {
+  color: var(--muted);
+}
+
 .step-card > p {
   color: var(--text-h);
   font-size: clamp(1.45rem, 4vw, 2.6rem);
@@ -520,6 +704,31 @@ summary {
   background: var(--tomato-soft);
   border-radius: 8px;
   color: var(--text-h);
+}
+
+.panic-action {
+  width: 100%;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--tomato-soft);
+  color: var(--text-h);
+  font-weight: 900;
+}
+
+.spin {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .learn-panel h1 {
@@ -567,6 +776,21 @@ summary {
   font-size: clamp(2.25rem, 5vw, 4.2rem);
 }
 
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--soft);
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 180ms ease;
+}
+
 .trust-row {
   gap: 8px;
   flex-wrap: wrap;
@@ -582,6 +806,17 @@ summary {
 .form-panel {
   display: grid;
   gap: 18px;
+}
+
+.sticky-submit {
+  position: sticky;
+  bottom: 12px;
+  padding-top: 4px;
+  background: linear-gradient(transparent, var(--surface) 34%);
+}
+
+.sticky-submit .primary-action {
+  width: 100%;
 }
 
 fieldset {
@@ -648,6 +883,21 @@ input[type='checkbox'] {
   accent-color: var(--green);
 }
 
+.fatal-state {
+  width: min(680px, calc(100% - 32px));
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  padding: 32px 0;
+}
+
+.fatal-state .panel {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
 .bottom-nav {
   display: none;
 }
@@ -668,7 +918,8 @@ input[type='checkbox'] {
   .onboarding,
   .help-grid,
   .lesson-list,
-  .substitution-grid {
+  .substitution-grid,
+  .mode-grid {
     grid-template-columns: 1fr;
   }
 
@@ -685,6 +936,23 @@ input[type='checkbox'] {
     grid-template-columns: 1fr;
   }
 
+  .mode-grid {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mode-card {
+    min-width: 180px;
+    scroll-snap-align: start;
+  }
+
+  .plan-stats {
+    grid-template-columns: 1fr;
+  }
+
   .form-grid,
   .segmented {
     grid-template-columns: 1fr 1fr;
@@ -698,7 +966,7 @@ input[type='checkbox'] {
     position: fixed;
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
     z-index: 12;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -745,5 +1013,54 @@ input[type='checkbox'] {
   .intro-panel,
   .form-panel {
     padding: 14px;
+  }
+
+  .topbar {
+    padding-inline: 14px;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 10vw, 2.45rem);
+    line-height: 1.04;
+  }
+
+  .mode-grid {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .mode-card {
+    min-width: 158px;
+    min-height: 94px;
+  }
+
+  .hero-actions,
+  .detail-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .primary-action,
+  .secondary-action {
+    width: 100%;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .search-box input {
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
   }
 }
