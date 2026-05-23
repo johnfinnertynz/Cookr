@@ -48,7 +48,9 @@ npm run lint
 - `docs/PRD.md`: product requirements.
 - `docs/UX_FLOW.md`: user flow.
 - `docs/ARCHITECTURE.md`: technical architecture.
+- `docs/PRODUCTION_ARCHITECTURE.md`: scalable startup architecture, APIs, recommendation engine, ingestion, caching, security, and roadmap.
 - `docs/schema.sql`: Supabase-ready schema.
+- `docs/schema.production.sql`: production-oriented normalized Supabase/Postgres schema.
 - `docs/TESTING_CHECKLIST.md`: QA checklist.
 
 ## Product Matching Approach

@@ -21,5 +21,7 @@
 - Keep product matching as a manual/search-link assistant unless Woolworths provides an approved API or explicit permission.
 - Add authenticated profiles, household pantry, saved plans, and analytics once the UX loop is validated.
 
+For the full production design, see `docs/PRODUCTION_ARCHITECTURE.md` and `docs/schema.production.sql`.
+
 ## Woolworths NZ Compliance Position
 The MVP uses user-clicked search URLs and manual curated matches only. It does not scrape Woolworths search pages, trolley, checkout, account, or secure areas. Estimated prices are labelled as estimates because they vary by store, date, specials, and product size.
