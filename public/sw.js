@@ -1,5 +1,7 @@
-const CACHE_NAME = 'cookr-shell-v4'
-const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons.svg']
+const CACHE_NAME = 'cookr-shell-v5'
+const scopeUrl = self.registration.scope
+const rootUrl = new URL('.', scopeUrl).toString()
+const SHELL_ASSETS = ['', 'manifest.webmanifest', 'favicon.svg', 'icons.svg'].map((asset) => new URL(asset, scopeUrl).toString())
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)))
@@ -19,7 +21,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
 
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/')))
+    event.respondWith(fetch(event.request).catch(() => caches.match(rootUrl)))
     return
   }
 
@@ -31,6 +33,6 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
         return response
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match(rootUrl))),
   )
 })

@@ -2,9 +2,9 @@
   "name": "Cookr",
   "short_name": "Cookr",
   "description": "Low-effort guided cooking for New Zealanders replacing takeaways.",
-  "id": "/",
-  "start_url": "/",
-  "scope": "/",
+  "id": ".",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#f7faf7",
@@ -12,7 +12,7 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -23,10 +23,10 @@
       "name": "Tonight mode",
       "short_name": "Tonight",
       "description": "Open Cookr and pick a low-effort dinner.",
-      "url": "/?mode=tonight",
+      "url": "./?mode=tonight",
       "icons": [
         {
-          "src": "/favicon.svg",
+          "src": "favicon.svg",
           "sizes": "any",
           "type": "image/svg+xml"
         }
@@ -36,10 +36,10 @@
       "name": "Shopping list",
       "short_name": "List",
       "description": "Open your current grocery list.",
-      "url": "/?view=shopping",
+      "url": "./?view=shopping",
       "icons": [
         {
-          "src": "/favicon.svg",
+          "src": "favicon.svg",
           "sizes": "any",
           "type": "image/svg+xml"
         }
