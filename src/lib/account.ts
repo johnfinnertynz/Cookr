@@ -6,7 +6,7 @@ export const defaultAccountState: AccountState = {
   email: '',
   syncEnabled: false,
   status: 'local',
-  message: 'Local-only beta mode. Add Supabase env vars to enable cloud sync.',
+  message: 'Your plan is saved privately on this device. Cloud backup is available only in configured beta builds.',
 }
 
 export const requestMagicLink = async (email: string): Promise<AccountState> => {
@@ -17,7 +17,7 @@ export const requestMagicLink = async (email: string): Promise<AccountState> => 
       email,
       syncEnabled: false,
       status: 'local',
-      message: 'Saved locally for beta. Supabase is not configured in this environment.',
+      message: 'Saved on this device. Cloud backup is not enabled in this beta build yet.',
     }
   }
 
@@ -34,7 +34,7 @@ export const requestMagicLink = async (email: string): Promise<AccountState> => 
       email,
       syncEnabled: false,
       status: 'error',
-      message: error.message,
+      message: 'We could not send that sign-in link. Check the email address and try again.',
     }
   }
 
@@ -43,7 +43,7 @@ export const requestMagicLink = async (email: string): Promise<AccountState> => 
     email,
     syncEnabled: true,
     status: 'ready',
-    message: 'Magic link sent. After sign-in, Cookr can sync profile, plan, favourites, and feedback.',
+    message: 'Sign-in link sent. After sign-in, Cookr can back up your setup, plan, favourites, and feedback.',
   }
 }
 
@@ -51,5 +51,5 @@ export const markLocalSyncSnapshot = (account: AccountState): AccountState => ({
   ...account,
   lastSyncAt: new Date().toISOString(),
   status: account.syncEnabled ? 'synced' : account.status,
-  message: account.syncEnabled ? 'Latest local snapshot marked for sync.' : account.message,
+  message: account.syncEnabled ? 'Latest Cookr plan checkpoint saved.' : account.message,
 })

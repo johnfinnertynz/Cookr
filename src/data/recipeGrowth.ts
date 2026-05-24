@@ -29,6 +29,7 @@ type RecipeTemplate = {
   visualCues: string[]
   leftovers: string[]
   nutrition: Recipe['nutrition']
+  flavourIds?: string[]
 }
 
 const flavourBoosts: Array<{
@@ -154,6 +155,7 @@ const templates: RecipeTemplate[] = [
     visualCues: ['Wrap should close without tearing.', 'Filling should look fresh and crunchy.'],
     leftovers: ['Keep filling separate for tomorrow.', 'Use hummus as a snack with toast.'],
     nutrition: { calories: 470, protein: 17, fibre: 10 },
+    flavourIds: ['garlic-herb', 'sweet-chilli', 'mild-taco', 'tomato-basil', 'lemon-pepper'],
   },
   {
     id: 'air-fryer-chicken-wrap',
@@ -406,6 +408,7 @@ const templates: RecipeTemplate[] = [
     visualCues: ['Egg should be set and not wet.', 'Rice should steam when opened.'],
     leftovers: ['Best eaten fresh.', 'Use extra spinach in wraps.'],
     nutrition: { calories: 480, protein: 28, fibre: 5 },
+    flavourIds: ['garlic-herb', 'sweet-chilli', 'teriyaki', 'mild-taco', 'tomato-basil'],
   },
   {
     id: 'air-fryer-tofu-bites',
@@ -694,6 +697,7 @@ const templates: RecipeTemplate[] = [
     visualCues: ['Falafel should be hot and crisp outside.', 'Pita should be warm and flexible.'],
     leftovers: ['Pack falafel and slaw separately.', 'Use hummus in tomorrow wraps.'],
     nutrition: { calories: 520, protein: 20, fibre: 12 },
+    flavourIds: ['garlic-herb', 'sweet-chilli', 'mild-taco', 'tomato-basil', 'lemon-pepper'],
   },
   {
     id: 'five-minute-toastie',
@@ -730,11 +734,12 @@ const templates: RecipeTemplate[] = [
     visualCues: ['Bread should be golden.', 'Cheese should melt and stretch.'],
     leftovers: ['Best fresh.', 'Use leftover spinach in eggs.'],
     nutrition: { calories: 460, protein: 21, fibre: 5 },
+    flavourIds: ['garlic-herb', 'sweet-chilli', 'mild-taco', 'tomato-basil'],
   },
 ]
 
 export const growthRecipes: Recipe[] = templates.filter((template) => template.id !== 'overnight-oats-dinner').flatMap((template) =>
-  flavourBoosts.map((flavour) => ({
+  flavourBoosts.filter((flavour) => !template.flavourIds || template.flavourIds.includes(flavour.id)).map((flavour) => ({
     ...template,
     id: `${template.id}-${flavour.id}`,
     title: `${flavour.label} ${template.title}`,

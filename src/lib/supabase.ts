@@ -18,4 +18,4 @@ export const getSupabaseClient = () => {
   return client
 }
 
-export const getSyncMode = () => (getSupabaseClient() ? 'Supabase ready' : 'Local-only beta')
+export const isCloudSyncAvailable = () => Boolean(getSupabaseClient())

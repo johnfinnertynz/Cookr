@@ -130,9 +130,12 @@ export const scoreRecipe = (recipe: Recipe, profile: UserProfile, context = make
     score += 8
     reasons.push('balanced')
   }
-  if (goalText.includes('reduce takeaways') || recipe.tags.includes('fakeaway')) {
-    score += 12
-    reasons.push(`${recipe.takeawayReplacement} fakeaway`)
+  if (goalText.includes('reduce takeaways')) {
+    score += recipe.tags.includes('fakeaway') ? 16 : 8
+    reasons.push(recipe.tags.includes('fakeaway') ? `${recipe.takeawayReplacement} takeaway swap` : 'takeaway-safe fallback')
+  } else if (recipe.tags.includes('fakeaway')) {
+    score += 8
+    reasons.push('takeaway-style')
   }
   if (goalText.includes('family meals') && recipe.takeawayReplacement === 'comfort food') {
     score += 45

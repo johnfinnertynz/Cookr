@@ -43,6 +43,7 @@ import { buildWeeklyPlan, getStarterPantryBundle, type StarterPantryItem, type W
 import { getRecipeVariants, type RecipeVariant } from './lib/recipeVariants'
 import { getBasketPriceConfidence } from './lib/priceGuide'
 import { defaultAccountState, markLocalSyncSnapshot, requestMagicLink } from './lib/account'
+import { isCloudSyncAvailable } from './lib/supabase'
 import { useInstallPrompt } from './lib/pwa'
 import { getAnalyticsEvents, getAnalyticsSummary, trackEvent } from './lib/analytics'
 import { useOnlineStatus, useStoredState } from './lib/storage'
@@ -71,6 +72,7 @@ const goalOptions = ['save money', 'eat healthier', 'high protein', 'lose weight
 const dietaryOptions = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'halal', 'low calorie', 'high protein', 'no restrictions']
 const applianceOptions = ['stovetop', 'oven', 'air fryer', 'slow cooker', 'microwave']
 const blockerOptions = ['too tired', 'too many dishes', 'no ingredients', 'too many steps', 'afraid of messing up', 'not enough time']
+const flavourSuffixes = ['garlic-herb', 'sweet-chilli', 'teriyaki', 'mild-taco', 'tomato-basil', 'lemon-pepper']
 
 const modeOptions: Array<{
   id: TonightMode
@@ -92,6 +94,37 @@ const toggleDietary = (list: string[], item: string) => {
   if (item === 'no restrictions') return list.includes(item) ? [] : ['no restrictions']
   const next = toggleItem(list.filter((value) => value !== 'no restrictions'), item)
   return next.length ? next : ['no restrictions']
+}
+
+const getRecipeCardLabel = (recipe: Recipe) => {
+  if (recipe.tags.includes('fakeaway')) return `${recipe.takeawayReplacement} takeaway swap`
+  if (recipe.tags.includes('no energy')) return 'low-effort dinner'
+  if (recipe.tags.includes('meal prep')) return 'meal prep'
+  if (recipe.timeMinutes <= 15) return '15-minute dinner'
+  return 'weeknight dinner'
+}
+
+const getRecipeFamilyId = (recipeId: string) => {
+  const suffix = flavourSuffixes.find((flavour) => recipeId.endsWith(`-${flavour}`))
+  return suffix ? recipeId.slice(0, -(suffix.length + 1)) : recipeId
+}
+
+const diversifyRecipeFamilies = <T extends { recipe: Recipe }>(items: T[]) => {
+  const seen = new Set<string>()
+  const firstChoices: T[] = []
+  const alternates: T[] = []
+
+  items.forEach((item) => {
+    const familyId = getRecipeFamilyId(item.recipe.id)
+    if (seen.has(familyId)) {
+      alternates.push(item)
+      return
+    }
+    seen.add(familyId)
+    firstChoices.push(item)
+  })
+
+  return [...firstChoices, ...alternates]
 }
 
 const updateInteraction = (
@@ -141,9 +174,16 @@ function Onboarding({
           <span>Low-energy modes</span>
           <span>Beginner-safe steps</span>
         </div>
+        <p className="setup-note">
+          Defaults are already sensible for a tired weeknight. Change only what matters tonight.
+        </p>
       </div>
 
       <div className="panel form-panel">
+        <div className="setup-note">
+          <BadgeCheck size={18} aria-hidden="true" />
+          <span>No account needed. Cookr will make a starter plan as soon as you finish setup.</span>
+        </div>
         <fieldset>
           <legend>Cooking confidence</legend>
           <div className="segmented">
@@ -318,6 +358,7 @@ function Onboarding({
         </label>
 
         <div className="sticky-submit">
+          <small>You can edit these choices later from Home.</small>
           <button className="primary-action" type="button" onClick={onFinish}>
             Build my cooking plan <ChevronRight size={18} aria-hidden="true" />
           </button>
@@ -399,8 +440,13 @@ function RecipeCard({
       </button>
       <div className="recipe-body">
         <div className="card-topline">
-          <span>{recipe.takeawayReplacement} fakeaway</span>
-          <button type="button" className={favourite ? 'icon-button saved' : 'icon-button'} onClick={onFavourite} aria-label="Save recipe">
+          <span>{getRecipeCardLabel(recipe)}</span>
+          <button
+            type="button"
+            className={favourite ? 'icon-button saved' : 'icon-button'}
+            onClick={onFavourite}
+            aria-label={favourite ? 'Unsave recipe' : 'Save recipe'}
+          >
             <Heart size={17} aria-hidden="true" />
           </button>
         </div>
@@ -450,8 +496,8 @@ function SafetyNote() {
     <div className="safety-note">
       <ShieldCheck size={17} aria-hidden="true" />
       <p>
-        Dietary tags and prices are guidance only. Check product labels, allergens, religious suitability,
-        and current Woolworths prices before buying or cooking.
+        Guidance only. Double-check product labels for allergens, dietary or religious suitability, and
+        current Woolworths prices before buying or cooking.
       </p>
     </div>
   )
@@ -460,9 +506,11 @@ function SafetyNote() {
 function FeedbackStrip({
   recipe,
   onFeedback,
+  onDismiss,
 }: {
   recipe?: Recipe
   onFeedback: (outcome: RecipeFeedback['outcome']) => void
+  onDismiss?: () => void
 }) {
   if (!recipe) return null
 
@@ -485,6 +533,11 @@ function FeedbackStrip({
             {label}
           </button>
         ))}
+        {onDismiss ? (
+          <button type="button" className="quiet-action" onClick={onDismiss}>
+            Not now
+          </button>
+        ) : null}
       </div>
     </section>
   )
@@ -593,7 +646,14 @@ function CookingMode({
         </div>
         <label className="serving-stepper">
           Serves
-          <input min="1" max="10" value={servings} inputMode="numeric" type="number" onChange={(event) => setServings(Number(event.target.value) || 1)} />
+          <input
+            min="1"
+            max="10"
+            value={servings}
+            inputMode="numeric"
+            type="number"
+            onChange={(event) => setServings(Math.min(10, Math.max(1, Number(event.target.value) || 1)))}
+          />
         </label>
       </div>
 
@@ -606,9 +666,18 @@ function CookingMode({
         ))}
       </div>
 
-      <div className="step-card">
-        <span>Step {step + 1} of {recipe.instructions.length}</span>
+      <div className="step-card" aria-live="polite">
+        <span className="step-count">Step {step + 1} of {recipe.instructions.length}</span>
         <p>{recipe.instructions[step]}</p>
+        <div className="step-actions">
+          <button type="button" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>Previous</button>
+          <button
+            type="button"
+            onClick={() => (finalStep ? onComplete() : setStep((value) => Math.min(recipe.instructions.length - 1, value + 1)))}
+          >
+            {finalStep ? 'Mark cooked' : 'Next step'}
+          </button>
+        </div>
         <div className="visual-cue">
           <strong>What should this look like?</strong>
           <span>{recipe.visualCues[step % recipe.visualCues.length]}</span>
@@ -616,15 +685,7 @@ function CookingMode({
         <div className="timer-strip">
           <Timer size={18} aria-hidden="true" />
           <strong>{step === 0 ? `${Math.max(5, recipe.activeTimeMinutes)} min active cooking` : 'Set a timer if you walk away'}</strong>
-        </div>
-        <div className="step-actions">
-          <button type="button" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>Back</button>
-          <button
-            type="button"
-            onClick={() => (finalStep ? onComplete() : setStep((value) => Math.min(recipe.instructions.length - 1, value + 1)))}
-          >
-            {finalStep ? 'Mark cooked' : 'Next step'}
-          </button>
+          <span>Clear one wrapper or dish while you wait.</span>
         </div>
       </div>
 
@@ -716,7 +777,7 @@ function ShoppingList({
                   <input
                     type="checkbox"
                     checked={line.checked}
-                    onChange={() => setChecked({ ...checked, [line.name]: !line.checked })}
+                    onChange={() => setChecked((current) => ({ ...current, [line.name]: !line.checked }))}
                   />
                   <span>
                     <strong>{line.name}</strong>
@@ -773,6 +834,7 @@ function AccountPanel({
 }) {
   const [email, setEmail] = useState(account.email)
   const [loading, setLoading] = useState(false)
+  const cloudSyncAvailable = isCloudSyncAvailable()
 
   const handleSyncRequest = async () => {
     setLoading(true)
@@ -785,17 +847,24 @@ function AccountPanel({
     <section className="panel account-panel" aria-labelledby="account-title">
       <Cloud aria-hidden="true" />
       <div>
-        <p className="section-label">Account and sync</p>
-        <h2 id="account-title">Local-first now, Supabase-ready next</h2>
+        <p className="section-label">Private beta account</p>
+        <h2 id="account-title">Back up your plan</h2>
         <p>{account.message}</p>
       </div>
       <label>
-        Email for beta sync
-        <input value={email} placeholder="you@example.co.nz" inputMode="email" onChange={(event) => setEmail(event.target.value)} />
+        Email
+        <input
+          value={email}
+          placeholder="you@example.co.nz"
+          autoComplete="email"
+          inputMode="email"
+          type="email"
+          onChange={(event) => setEmail(event.target.value)}
+        />
       </label>
       <div className="inline-actions">
         <button className="secondary-action" type="button" disabled={!email.trim() || loading} onClick={() => void handleSyncRequest()}>
-          {loading ? 'Checking...' : 'Send magic link'}
+          {loading ? 'Checking...' : cloudSyncAvailable ? 'Send sign-in link' : 'Save email locally'}
         </button>
         <button
           className="secondary-action"
@@ -805,10 +874,13 @@ function AccountPanel({
             trackEvent('local_sync_snapshot_marked', { enabled: account.syncEnabled })
           }}
         >
-          Mark snapshot
+          Save checkpoint
         </button>
       </div>
-      <small>Status: {account.status}{account.lastSyncAt ? ` - ${new Date(account.lastSyncAt).toLocaleDateString()}` : ''}</small>
+      <small>
+        Status: {account.syncEnabled ? account.status : 'saved on this device'}
+        {account.lastSyncAt ? ` - ${new Date(account.lastSyncAt).toLocaleDateString()}` : ''}
+      </small>
     </section>
   )
 }
@@ -832,7 +904,7 @@ function AnalyticsDashboard({ feedbackCount }: { feedbackCount: number }) {
         <span><strong>{feedbackCount}</strong> feedback</span>
       </div>
       <p className="source-note">
-        MVP analytics stay on-device. Production should forward consented events to Supabase or a privacy-aware analytics service.
+        Beta analytics stay on this device unless a consented production analytics service is configured.
       </p>
     </section>
   )
@@ -931,13 +1003,13 @@ function App() {
   const ranked = useMemo(() => filterRecipes(activeFilters, profile, context), [activeFilters, profile, context])
   const searchedRecipes = useMemo(() => {
     const query = deferredSearch.trim().toLowerCase()
-    if (!query) return ranked
-    return ranked.filter(({ recipe }) =>
+    if (!query) return diversifyRecipeFamilies(ranked)
+    return diversifyRecipeFamilies(ranked.filter(({ recipe }) =>
       [recipe.title, recipe.cuisine, recipe.takeawayReplacement, recipe.tags.join(' '), recipe.ingredients.map((item) => item.name).join(' ')]
         .join(' ')
         .toLowerCase()
         .includes(query),
-    )
+    ))
   }, [deferredSearch, ranked])
   const recommendations = useMemo(() => getRankedRecipes(profile, context), [profile, context])
   const selectedRecipes = useMemo(
@@ -1047,7 +1119,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={view === 'cook' ? 'app-shell cooking-shell' : 'app-shell'}>
       <StatusBanner online={online} />
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Cookr home" onClick={() => setView('home')}>
@@ -1134,7 +1206,12 @@ function App() {
 
             <FeedbackStrip
               recipe={recentCookedRecipe}
-              onFeedback={(outcome) => recentCookedRecipe ? addRecipeFeedback(recentCookedRecipe.id, outcome) : undefined}
+              onFeedback={(outcome) => {
+                if (!recentCookedRecipe) return
+                addRecipeFeedback(recentCookedRecipe.id, outcome)
+                setRecentCookedRecipeId(null)
+              }}
+              onDismiss={() => setRecentCookedRecipeId(null)}
             />
 
             {easierFallback ? (

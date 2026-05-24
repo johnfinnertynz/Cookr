@@ -15,6 +15,11 @@ button {
   touch-action: manipulation;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -395,6 +400,7 @@ p {
   aspect-ratio: 4 / 3;
   object-fit: cover;
   display: block;
+  background: var(--soft);
 }
 
 .image-button {
@@ -411,6 +417,11 @@ p {
   padding: 14px;
   display: grid;
   gap: 10px;
+}
+
+.recipe-body h3 {
+  font-size: 1.08rem;
+  line-height: 1.16;
 }
 
 .card-topline {
@@ -460,6 +471,7 @@ p {
 .recipe-card button,
 .step-actions button,
 .text-action,
+.quiet-action,
 .inline-actions button,
 .feedback-actions button {
   min-height: 38px;
@@ -472,6 +484,11 @@ p {
 .text-action {
   width: fit-content;
   border: 0;
+  border-radius: 7px;
+}
+
+.quiet-action {
+  border: 1px solid var(--border);
   border-radius: 7px;
 }
 
@@ -663,6 +680,10 @@ p {
   font-size: 1.25rem;
 }
 
+.planner-main h1 {
+  font-size: clamp(1.75rem, 3vw, 2.65rem);
+}
+
 .inline-actions,
 .feedback-actions {
   display: flex;
@@ -763,6 +784,8 @@ p {
   display: flex;
   gap: 10px;
   align-items: center;
+  min-height: 44px;
+  cursor: pointer;
 }
 
 .grocery-row span,
@@ -775,6 +798,10 @@ p {
   color: var(--green-strong);
   font-weight: 800;
   text-decoration: none;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--soft);
 }
 
 .grocery-row.checked {
@@ -794,6 +821,7 @@ p {
 
 .cooking-mode {
   max-width: 920px;
+  margin-inline: auto;
 }
 
 .cooking-header {
@@ -829,9 +857,18 @@ p {
 .step-card {
   padding: 22px;
   border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--green) 24%, var(--border));
   background: var(--green-soft);
   display: grid;
   gap: 14px;
+}
+
+.step-count {
+  color: var(--green-strong);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .visual-cue {
@@ -846,18 +883,30 @@ p {
 
 .step-card > p {
   color: var(--text-h);
-  font-size: clamp(1.45rem, 4vw, 2.6rem);
-  line-height: 1.08;
+  font-size: clamp(1.28rem, 3vw, 2.1rem);
+  line-height: 1.14;
   font-weight: 800;
 }
 
 .timer-strip {
   gap: 8px;
+  flex-wrap: wrap;
   color: var(--green-strong);
+}
+
+.timer-strip span {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .step-actions {
   justify-content: space-between;
+  gap: 10px;
+}
+
+.step-actions button:last-child {
+  background: var(--green);
+  color: white;
 }
 
 details {
@@ -941,9 +990,7 @@ summary {
   top: 24px;
   display: grid;
   gap: 18px;
-  background:
-    linear-gradient(135deg, rgba(42, 157, 105, 0.14), transparent 45%),
-    var(--surface);
+  background: var(--surface);
 }
 
 .intro-panel h1 {
@@ -977,6 +1024,24 @@ summary {
   font-weight: 800;
 }
 
+.setup-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--text-h);
+  font-size: 0.92rem;
+  font-weight: 750;
+}
+
+.setup-note svg {
+  color: var(--green);
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .form-panel {
   display: grid;
   gap: 18px;
@@ -985,12 +1050,19 @@ summary {
 .sticky-submit {
   position: sticky;
   bottom: 12px;
+  display: grid;
+  gap: 8px;
   padding-top: 4px;
   background: linear-gradient(transparent, var(--surface) 34%);
 }
 
 .sticky-submit .primary-action {
   width: 100%;
+}
+
+.sticky-submit small {
+  color: var(--muted);
+  text-align: center;
 }
 
 fieldset {
@@ -1113,6 +1185,10 @@ input[type='checkbox'] {
     grid-template-columns: 1fr;
   }
 
+  .detail-panel > img {
+    height: auto;
+  }
+
   .mode-grid {
     display: flex;
     overflow-x: auto;
@@ -1168,6 +1244,15 @@ input[type='checkbox'] {
   .bottom-nav svg {
     width: 19px;
     height: 19px;
+  }
+
+  .cooking-shell main {
+    padding-bottom: 24px;
+  }
+
+  .cooking-shell .bottom-nav {
+    position: static;
+    margin: 0 12px max(12px, env(safe-area-inset-bottom));
   }
 }
 
@@ -1238,6 +1323,36 @@ input[type='checkbox'] {
     position: static;
     padding-top: 0;
     background: transparent;
+  }
+
+  .feedback-strip,
+  .fallback-strip,
+  .price-confidence {
+    display: grid;
+    justify-items: start;
+  }
+
+  .grocery-row {
+    padding: 10px;
+  }
+
+  .grocery-row input[type='checkbox'] {
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    min-height: 22px;
+  }
+
+  .step-card {
+    padding: 16px;
+  }
+
+  .step-card > p {
+    font-size: clamp(1.2rem, 7vw, 1.65rem);
+  }
+
+  .step-actions button {
+    min-height: 48px;
   }
 }
 
