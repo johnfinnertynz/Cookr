@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   BadgeCheck,
@@ -30,6 +30,7 @@ import {
 import './App.css'
 import { recipes } from './data/recipes'
 import { cookingTerms, panicHelp, substitutions } from './lib/cookingHelp'
+import { betaConfig } from './lib/betaConfig'
 import { buildGroceryList, estimateBasketTotal } from './lib/grocery'
 import {
   defaultProfile,
@@ -47,7 +48,7 @@ import { isCloudSyncAvailable } from './lib/supabase'
 import { useInstallPrompt } from './lib/pwa'
 import { getAnalyticsEvents, getAnalyticsSummary, trackEvent } from './lib/analytics'
 import { useOnlineStatus, useStoredState } from './lib/storage'
-import type { AccountState, Recipe, RecipeFeedback, RecipeInteraction, TonightMode, UserProfile } from './types'
+import type { AccountState, BetaIssueReport, Recipe, RecipeFeedback, RecipeInteraction, TonightMode, UserProfile } from './types'
 
 const filters = [
   'easy/fast',
@@ -109,22 +110,47 @@ const getRecipeFamilyId = (recipeId: string) => {
   return suffix ? recipeId.slice(0, -(suffix.length + 1)) : recipeId
 }
 
+const getRecipeFlavourId = (recipeId: string) =>
+  flavourSuffixes.find((flavour) => recipeId.endsWith(`-${flavour}`)) ?? 'core'
+
 const diversifyRecipeFamilies = <T extends { recipe: Recipe }>(items: T[]) => {
-  const seen = new Set<string>()
+  const groups = new Map<string, T[]>()
+  const familyOrder: string[] = []
   const firstChoices: T[] = []
   const alternates: T[] = []
+  const flavourCounts = new Map<string, number>()
 
   items.forEach((item) => {
     const familyId = getRecipeFamilyId(item.recipe.id)
-    if (seen.has(familyId)) {
-      alternates.push(item)
-      return
+    if (!groups.has(familyId)) {
+      familyOrder.push(familyId)
+      groups.set(familyId, [])
     }
-    seen.add(familyId)
-    firstChoices.push(item)
+    groups.get(familyId)?.push(item)
+  })
+
+  familyOrder.forEach((familyId) => {
+    const group = groups.get(familyId) ?? []
+    const choice =
+      group.find((item) => (flavourCounts.get(getRecipeFlavourId(item.recipe.id)) ?? 0) < 2) ??
+      group[0]
+
+    if (!choice) return
+    firstChoices.push(choice)
+    const flavourId = getRecipeFlavourId(choice.recipe.id)
+    flavourCounts.set(flavourId, (flavourCounts.get(flavourId) ?? 0) + 1)
+    alternates.push(...group.filter((item) => item.recipe.id !== choice.recipe.id))
   })
 
   return [...firstChoices, ...alternates]
+}
+
+const findTrustedRepeatRecipe = (interactions: RecipeInteraction[], favourites: string[], fallback?: Recipe) => {
+  const cooked = interactions
+    .filter((interaction) => interaction.wouldRepeat || interaction.cookedCount)
+    .sort((a, b) => (Date.parse(b.lastCookedAt ?? '') || 0) - (Date.parse(a.lastCookedAt ?? '') || 0))
+  const repeatId = cooked[0]?.recipeId ?? favourites[0]
+  return recipes.find((recipe) => recipe.id === repeatId) ?? fallback
 }
 
 const updateInteraction = (
@@ -153,6 +179,11 @@ function Onboarding({
     Math.min(20, profile.goals.length * 5) +
     Math.min(20, profile.styles.length * 4) +
     Math.min(20, profile.blockers.length * 5)
+  const initialConfidenceRef = useRef(profile.confidence)
+
+  useEffect(() => {
+    trackEvent('onboarding_started', { confidence: initialConfidenceRef.current })
+  }, [])
 
   return (
     <section className="onboarding" aria-labelledby="onboarding-title">
@@ -375,6 +406,17 @@ function StatusBanner({ online }: { online: boolean }) {
     <div className="status-banner" role="status">
       <WifiOff size={17} aria-hidden="true" />
       You are offline. Your plan and cooking steps still work on this device.
+    </div>
+  )
+}
+
+function MaintenanceNotice() {
+  if (!betaConfig.maintenanceMode) return null
+
+  return (
+    <div className="status-banner maintenance-banner" role="status">
+      <AlertCircle size={17} aria-hidden="true" />
+      Cookr is in a short beta maintenance window. Saved plans still work on this device.
     </div>
   )
 }
@@ -717,10 +759,12 @@ function ShoppingList({
   selectedRecipes,
   profile,
   onFindRecipes,
+  onCook,
 }: {
   selectedRecipes: Recipe[]
   profile: UserProfile
   onFindRecipes: () => void
+  onCook: (recipeId: string) => void
 }) {
   const [checked, setChecked] = useStoredState<Record<string, boolean>>('cookr.grocery.checked.v1', {})
   const baseLines = useMemo(() => buildGroceryList(selectedRecipes, profile.pantryItems), [selectedRecipes, profile.pantryItems])
@@ -753,7 +797,19 @@ function ShoppingList({
           <p className="section-label">Woolworths assistant</p>
           <h2 id="shopping-title">Grocery list</h2>
         </div>
-        <strong>${total.toFixed(2)} est.</strong>
+        <div className="shopping-summary">
+          <strong>${total.toFixed(2)} est.</strong>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => {
+              trackEvent('shopping_to_cook_clicked', { recipeId: selectedRecipes[0].id })
+              onCook(selectedRecipes[0].id)
+            }}
+          >
+            Cook first meal
+          </button>
+        </div>
       </div>
       <p className="source-note">
         Links open user-controlled Woolworths NZ searches. Prices are estimates; Cookr does not scrape result
@@ -799,6 +855,13 @@ function ShoppingList({
 
 function InstallPromptCard() {
   const { canInstall, installed, promptInstall } = useInstallPrompt()
+  const installPromptTrackedRef = useRef(false)
+
+  useEffect(() => {
+    if (!canInstall || installPromptTrackedRef.current) return
+    installPromptTrackedRef.current = true
+    trackEvent('install_prompt_available', { installed })
+  }, [canInstall, installed])
 
   return (
     <section className="panel install-card">
@@ -895,17 +958,100 @@ function AnalyticsDashboard({ feedbackCount }: { feedbackCount: number }) {
         <p className="section-label">Beta analytics</p>
         <h2 id="analytics-title">Drop-off signals on this device</h2>
       </div>
-      <div className="metric-grid">
-        <span><strong>{summary.onboardingCompleted}</strong> onboarded</span>
-        <span><strong>{summary.recipesSaved}</strong> saves</span>
-        <span><strong>{summary.recipesCooked}</strong> cooks</span>
-        <span><strong>{summary.listsCreated}</strong> lists</span>
-        <span><strong>{summary.productClicks}</strong> product clicks</span>
-        <span><strong>{feedbackCount}</strong> feedback</span>
-      </div>
+      {summary.totalEvents ? (
+        <div className="metric-grid">
+          <span><strong>{summary.onboardingCompleted}</strong> onboarded</span>
+          <span><strong>{summary.recipeViews}</strong> views</span>
+          <span><strong>{summary.cookingStarted}</strong> cook starts</span>
+          <span><strong>{summary.recipesCooked}</strong> completed</span>
+          <span><strong>{summary.conversion.cookCompletionRate}%</strong> cook completion</span>
+          <span><strong>{summary.listsCreated}</strong> lists</span>
+          <span><strong>{summary.productClicks}</strong> product clicks</span>
+          <span><strong>{summary.repeatRecipeCooks}</strong> repeats</span>
+          <span><strong>{summary.dropOffEvents}</strong> risk signals</span>
+          <span><strong>{feedbackCount}</strong> feedback</span>
+        </div>
+      ) : (
+        <div className="empty-analytics">
+          <strong>No beta signals yet</strong>
+          <span>Use Cookr once and this panel will show local funnel health.</span>
+        </div>
+      )}
       <p className="source-note">
         Beta analytics stay on this device unless a consented production analytics service is configured.
       </p>
+    </section>
+  )
+}
+
+function BetaFeedbackPanel({
+  view,
+  reports,
+  setReports,
+}: {
+  view: string
+  reports: BetaIssueReport[]
+  setReports: (reports: BetaIssueReport[]) => void
+}) {
+  const [type, setType] = useState<BetaIssueReport['type']>('confusing')
+  const [note, setNote] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  if (!betaConfig.feedbackEnabled) return null
+
+  const submitReport = () => {
+    const trimmedNote = note.trim()
+    const report: BetaIssueReport = {
+      id: window.crypto?.randomUUID?.() ?? `${Date.now()}`,
+      type,
+      view,
+      note: trimmedNote,
+      occurredAt: new Date().toISOString(),
+    }
+    setReports([...reports.slice(-24), report])
+    setSaved(true)
+    setNote('')
+    trackEvent('beta_issue_reported', {
+      type,
+      view,
+      noteLength: trimmedNote.length,
+    })
+  }
+
+  return (
+    <section className="panel beta-feedback" aria-labelledby="beta-feedback-title">
+      <MessageSquare aria-hidden="true" />
+      <div>
+        <p className="section-label">Beta feedback</p>
+        <h2 id="beta-feedback-title">What felt harder than it should?</h2>
+        <p>Saved on this device for beta review. Avoid personal, medical, or allergy details.</p>
+      </div>
+      <label>
+        Issue type
+        <select value={type} onChange={(event) => setType(event.target.value as BetaIssueReport['type'])}>
+          <option value="confusing">Confusing UX</option>
+          <option value="recipe_issue">Recipe concern</option>
+          <option value="grocery_issue">Grocery issue</option>
+          <option value="bug">Bug</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>
+        Short note
+        <textarea
+          value={note}
+          maxLength={500}
+          placeholder="e.g. I could not tell what to do after shopping"
+          onChange={(event) => {
+            setSaved(false)
+            setNote(event.target.value)
+          }}
+        />
+      </label>
+      <button className="secondary-action" type="button" onClick={submitReport}>
+        Save beta note
+      </button>
+      <small>{saved ? 'Saved locally. Thank you.' : `${reports.length} notes saved on this device.`}</small>
     </section>
   )
 }
@@ -986,6 +1132,7 @@ function App() {
   const [favourites, setFavourites] = useStoredState<string[]>('cookr.favourites.v1', ['veggie-pizza-pita'])
   const [interactions, setInteractions] = useStoredState<RecipeInteraction[]>('cookr.interactions.v1', [])
   const [feedback, setFeedback] = useStoredState<RecipeFeedback[]>('cookr.feedback.v1', [])
+  const [betaReports, setBetaReports] = useStoredState<BetaIssueReport[]>('cookr.betaReports.v1', [])
   const [account, setAccount] = useStoredState<AccountState>('cookr.account.v1', defaultAccountState)
   const [recentCookedRecipeId, setRecentCookedRecipeId] = useStoredState<string | null>('cookr.recentCookedRecipe.v1', null)
   const [activeRecipeId, setActiveRecipeId] = useStoredState('cookr.activeRecipe.v1', recipes[0].id)
@@ -993,7 +1140,11 @@ function App() {
   const [mode, setMode] = useStoredState<TonightMode>('cookr.mode.v1', 'cook_15')
   const [searchTerm, setSearchTerm] = useState('')
   const [isStarting, setIsStarting] = useState(false)
-  const [visibleRecipeCount, setVisibleRecipeCount] = useState(24)
+  const [visibleRecipeCount, setVisibleRecipeCount] = useState(12)
+  const previousViewRef = useRef(view)
+  const cookingCompletedRef = useRef(false)
+  const lastTrackedSearchRef = useRef('')
+  const initialSessionRef = useRef({ view, onboarded })
   const deferredSearch = useDeferredValue(searchTerm)
 
   const context = useMemo(
@@ -1036,6 +1187,39 @@ function App() {
   const visibleSearchedRecipes = searchedRecipes.slice(0, visibleRecipeCount)
   const overlapScore = getIngredientOverlapScore(selectedRecipes)
   const cookedMeals = interactions.reduce((sum, interaction) => sum + (interaction.cookedCount ?? 0), 0)
+  const repeatRecipe = findTrustedRepeatRecipe(interactions, favourites, selectedRecipes[0] ?? topRecommendation?.recipe)
+
+  useEffect(() => {
+    trackEvent('session_started', initialSessionRef.current)
+    return () => trackEvent('session_completed', { view: previousViewRef.current })
+  }, [])
+
+  useEffect(() => {
+    if (previousViewRef.current === view) return
+    if (previousViewRef.current === 'cook' && !cookingCompletedRef.current) {
+      trackEvent('cooking_session_exited', { nextView: view, recipeId: activeRecipe.id })
+    }
+    cookingCompletedRef.current = false
+    previousViewRef.current = view
+    trackEvent('view_opened', { view })
+    if (view === 'plan') trackEvent('weekly_planner_viewed', { selectedCount: selectedIds.length })
+  }, [activeRecipe.id, selectedIds.length, view])
+
+  useEffect(() => {
+    const query = deferredSearch.trim()
+    if (query.length < 2 || query === lastTrackedSearchRef.current) return
+    lastTrackedSearchRef.current = query
+    trackEvent('recipe_search_used', {
+      queryLength: query.length,
+      resultCount: searchedRecipes.length,
+    })
+  }, [deferredSearch, searchedRecipes.length])
+
+  useEffect(() => {
+    if (!searchedRecipes.length && (activeFilters.length || deferredSearch.trim())) {
+      trackEvent('empty_results_seen', { filterCount: activeFilters.length, hasSearch: Boolean(deferredSearch.trim()) })
+    }
+  }, [activeFilters.length, deferredSearch, searchedRecipes.length])
 
   const handleFinishOnboarding = () => {
     const starterContext = makeRecommendationContext(profile, {
@@ -1051,7 +1235,13 @@ function App() {
     setActiveFilters([])
     setMode(starterContext.mode)
     setOnboarded(true)
-    trackEvent('onboarding_completed', { confidence: profile.confidence, blockers: profile.blockers.length })
+    trackEvent('onboarding_completed', {
+      confidence: profile.confidence,
+      blockers: profile.blockers.length,
+      dietaries: profile.dietaries.length,
+      appliances: profile.appliances.length,
+      starterMode: starterContext.mode,
+    })
   }
 
   const openRecipe = (recipeId: string) => {
@@ -1066,9 +1256,10 @@ function App() {
 
   const addWeeklyPlan = () => {
     const weekIds = weeklyPlan.map((slot) => slot.recipe.id)
-    setSelectedIds(Array.from(new Set([...selectedIds, ...weekIds])))
+    const nextIds = Array.from(new Set([...selectedIds, ...weekIds]))
+    setSelectedIds(nextIds)
     setView('shopping')
-    trackEvent('weekly_plan_added', { recipeCount: weekIds.length })
+    trackEvent('weekly_plan_added', { recipeCount: weekIds.length, addedCount: nextIds.length - selectedIds.length })
   }
 
   const addRecipeFeedback = (recipeId: string, outcome: RecipeFeedback['outcome']) => {
@@ -1080,6 +1271,13 @@ function App() {
   }
 
   const handleStartCooking = (recipeId = activeRecipe.id) => {
+    const current = interactions.find((interaction) => interaction.recipeId === recipeId)
+    trackEvent('cook_now_clicked', {
+      recipeId,
+      mode,
+      repeat: Boolean(current?.cookedCount),
+      selectedCount: selectedIds.length,
+    })
     setIsStarting(true)
     setActiveRecipeId(recipeId)
     window.setTimeout(() => {
@@ -1091,13 +1289,16 @@ function App() {
 
   const handleCooked = () => {
     const current = interactions.find((interaction) => interaction.recipeId === activeRecipe.id)
+    const repeat = Boolean(current?.cookedCount)
     setInteractions(updateInteraction(interactions, activeRecipe.id, {
       cookedCount: (current?.cookedCount ?? 0) + 1,
       lastCookedAt: new Date().toISOString(),
       wouldRepeat: true,
     }))
     setRecentCookedRecipeId(activeRecipe.id)
-    trackEvent('cooking_completed', { recipeId: activeRecipe.id })
+    cookingCompletedRef.current = true
+    trackEvent('cooking_completed', { recipeId: activeRecipe.id, repeat })
+    if (repeat) trackEvent('repeat_recipe_cooked', { recipeId: activeRecipe.id })
     setView('home')
   }
 
@@ -1121,6 +1322,7 @@ function App() {
   return (
     <div className={view === 'cook' ? 'app-shell cooking-shell' : 'app-shell'}>
       <StatusBanner online={online} />
+      <MaintenanceNotice />
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Cookr home" onClick={() => setView('home')}>
           <ChefHat aria-hidden="true" /> Cookr
@@ -1150,7 +1352,7 @@ function App() {
               mode={mode}
               onModeChange={(nextMode) => {
                 setMode(nextMode)
-                setVisibleRecipeCount(24)
+                setVisibleRecipeCount(12)
                 trackEvent('tonight_mode_selected', { mode: nextMode })
               }}
             />
@@ -1191,16 +1393,30 @@ function App() {
               </div>
               <div className="quick-plan panel">
                 <Sparkles aria-hidden="true" />
-                <h2>This week</h2>
+                <p className="section-label">Come back path</p>
+                <h2>Make tomorrow easier</h2>
                 <div className="meal-row"><span>Next</span> {selectedRecipes[0]?.title ?? 'Pick a meal'}</div>
-                <div className="meal-row"><span>Repeat</span> {favourites.length ? recipes.find((recipe) => recipe.id === favourites[0])?.title : 'Save a reliable meal'}</div>
+                <div className="meal-row"><span>Repeat</span> {repeatRecipe?.title ?? 'Save a reliable meal'}</div>
                 <div className="meal-row"><span>Leftovers</span> {selectedRecipes[0]?.leftovers[0] ?? 'Cook once, eat twice'}</div>
                 <div className="plan-stats">
                   <span>{cookedMeals} cooked</span>
                   <span>{overlapScore} overlaps</span>
                   <span>${selectedRecipes.reduce((sum, recipe) => sum + recipe.costEstimateNzd, 0).toFixed(0)}/serve week</span>
                 </div>
-                <button className="text-action" type="button" onClick={() => setOnboarded(false)}>Edit setup</button>
+                <div className="quick-actions">
+                  {repeatRecipe ? (
+                    <button className="secondary-action" type="button" onClick={() => handleStartCooking(repeatRecipe.id)}>
+                      Cook again
+                    </button>
+                  ) : null}
+                  <button className="secondary-action" type="button" onClick={() => {
+                    setView('shopping')
+                    trackEvent('quick_plan_list_opened', { selectedCount: selectedIds.length })
+                  }}>
+                    Open list
+                  </button>
+                  <button className="text-action" type="button" onClick={() => setOnboarded(false)}>Edit setup</button>
+                </div>
               </div>
             </section>
 
@@ -1241,7 +1457,7 @@ function App() {
                     placeholder="Search meals or ingredients"
                     onChange={(event) => {
                       setSearchTerm(event.target.value)
-                      setVisibleRecipeCount(24)
+                      setVisibleRecipeCount(12)
                     }}
                   />
                 </label>
@@ -1254,8 +1470,13 @@ function App() {
                     key={filter}
                     type="button"
                     onClick={() => {
-                      setActiveFilters(toggleItem(activeFilters, filter))
-                      setVisibleRecipeCount(24)
+                      const nextFilters = toggleItem(activeFilters, filter)
+                      setActiveFilters(nextFilters)
+                      setVisibleRecipeCount(12)
+                      trackEvent('recipe_filter_toggled', { filter, active: nextFilters.includes(filter), filterCount: nextFilters.length })
+                      if (['vegetarian', 'healthy', 'high protein'].includes(filter)) {
+                        trackEvent('dietary_filter_used', { filter })
+                      }
                     }}
                   >
                     {filter}
@@ -1284,8 +1505,8 @@ function App() {
                   />
                 ))}
                 {visibleRecipeCount < searchedRecipes.length ? (
-                  <button className="show-more-card" type="button" onClick={() => setVisibleRecipeCount((value) => value + 24)}>
-                    Show 24 more recipes
+                  <button className="show-more-card" type="button" onClick={() => setVisibleRecipeCount((value) => value + 12)}>
+                    Show 12 more recipes
                     <small>{searchedRecipes.length - visibleRecipeCount} still hidden for speed</small>
                   </button>
                 ) : null}
@@ -1344,11 +1565,19 @@ function App() {
               <InstallPromptCard />
               <AccountPanel account={account} setAccount={setAccount} />
               <AnalyticsDashboard feedbackCount={feedback.length} />
+              <BetaFeedbackPanel view={view} reports={betaReports} setReports={setBetaReports} />
             </section>
           </>
         )}
 
-        {view === 'shopping' && <ShoppingList selectedRecipes={selectedRecipes} profile={profile} onFindRecipes={() => setView('home')} />}
+        {view === 'shopping' && (
+          <ShoppingList
+            selectedRecipes={selectedRecipes}
+            profile={profile}
+            onFindRecipes={() => setView('home')}
+            onCook={handleStartCooking}
+          />
+        )}
         {view === 'cook' && (topRecommendation ? (
           <CookingMode key={activeRecipe.id} recipe={activeRecipe} onComplete={handleCooked} onTooHard={handleTooHard} />
         ) : (

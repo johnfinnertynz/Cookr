@@ -30,6 +30,7 @@ export const requestMagicLink = async (email: string): Promise<AccountState> => 
 
   if (error) {
     trackEvent('account_sync_failed', { reason: error.message })
+    trackEvent('sync_failure_seen', { surface: 'account' })
     return {
       email,
       syncEnabled: false,

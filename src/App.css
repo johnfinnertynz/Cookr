@@ -6,7 +6,8 @@
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -305,6 +306,18 @@ p {
   text-align: center;
 }
 
+.quick-actions,
+.shopping-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.shopping-summary {
+  justify-content: flex-end;
+}
+
 .meal-row span,
 .section-label,
 .card-topline span,
@@ -476,6 +489,8 @@ p {
 .feedback-actions button {
   min-height: 38px;
   padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
   background: var(--soft);
   color: var(--text-h);
   font-weight: 800;
@@ -739,6 +754,19 @@ p {
   font-size: 1.35rem;
 }
 
+.empty-analytics {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.empty-analytics strong {
+  color: var(--text-h);
+}
+
 .show-more-card {
   min-height: 180px;
   place-content: center;
@@ -759,6 +787,23 @@ p {
   padding: 20px;
   display: grid;
   gap: 18px;
+}
+
+.beta-feedback {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.beta-feedback label {
+  display: grid;
+  gap: 7px;
+  font-weight: 800;
+}
+
+.beta-feedback textarea {
+  min-height: 104px;
+  resize: vertical;
 }
 
 .grocery-row {
@@ -1109,7 +1154,8 @@ legend {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   box-sizing: border-box;
   min-height: 42px;
@@ -1118,6 +1164,11 @@ select {
   border-radius: 8px;
   background: var(--surface);
   color: var(--text-h);
+}
+
+textarea {
+  padding-block: 10px;
+  line-height: 1.35;
 }
 
 input[type='checkbox'] {
@@ -1199,6 +1250,19 @@ input[type='checkbox'] {
 
   .mode-card {
     min-width: 180px;
+    scroll-snap-align: start;
+  }
+
+  .filter-drawer {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filter-drawer .chip {
+    flex: 0 0 auto;
     scroll-snap-align: start;
   }
 
@@ -1301,9 +1365,12 @@ input[type='checkbox'] {
   .detail-actions,
   .feedback-actions,
   .inline-actions,
-  .variant-grid {
+  .variant-grid,
+  .quick-actions,
+  .shopping-summary {
     display: grid;
     grid-template-columns: 1fr;
+    justify-items: stretch;
   }
 
   .primary-action,

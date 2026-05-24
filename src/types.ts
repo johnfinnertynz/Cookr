@@ -123,6 +123,14 @@ export type AnalyticsEvent = {
   properties?: Record<string, string | number | boolean | null>
 }
 
+export type BetaIssueReport = {
+  id: string
+  type: 'confusing' | 'recipe_issue' | 'grocery_issue' | 'bug' | 'other'
+  view: string
+  note: string
+  occurredAt: string
+}
+
 export type RecipeFeedback = {
   recipeId: string
   outcome: 'would_repeat' | 'too_hard' | 'too_expensive' | 'not_filling' | 'shopping_issue'

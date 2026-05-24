@@ -59,7 +59,8 @@ body {
 a,
 button,
 input,
-select {
+select,
+textarea {
   outline-color: var(--green);
   outline-offset: 3px;
 }
@@ -67,7 +68,8 @@ select {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--green);
 }
 

@@ -7,9 +7,12 @@ type BeforeInstallPromptEvent = Event & {
 
 export const useInstallPrompt = () => {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
-  const [installed, setInstalled] = useState(() => window.matchMedia?.('(display-mode: standalone)').matches ?? false)
+  const [installed, setInstalled] = useState(() =>
+    typeof window === 'undefined' ? false : window.matchMedia?.('(display-mode: standalone)').matches ?? false,
+  )
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined
     const handleBeforeInstall = (event: Event) => {
       event.preventDefault()
       setPromptEvent(event as BeforeInstallPromptEvent)

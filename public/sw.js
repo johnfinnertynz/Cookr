@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cookr-shell-v3'
+const CACHE_NAME = 'cookr-shell-v4'
 const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons.svg']
 
 self.addEventListener('install', (event) => {
