@@ -20,8 +20,8 @@ try {
     await onboardingButton.click()
   }
 
-  await page.locator('.mode-card').filter({ hasText: 'No energy' }).click()
-  await page.getByRole('button', { name: /start cooking/i }).first().click()
+  await page.locator('.mode-card').filter({ hasText: "I'm tired" }).click()
+  await page.getByRole('button', { name: /cook this|start cooking/i }).first().click()
   await page.getByText(/Step 1 of/i).waitFor({ timeout: 5000 })
   await page.getByRole('button', { name: /^List$/i }).click()
   await page.getByText(/Grocery list/i).waitFor({ timeout: 5000 })

@@ -13,7 +13,7 @@ import {
   Dumbbell,
   Flame,
   Heart,
-  Loader2,
+  ImageOff,
   MessageSquare,
   Minus,
   Moon,
@@ -50,7 +50,7 @@ import { defaultAccountState, markLocalSyncSnapshot, requestMagicLink } from './
 import { isCloudSyncAvailable } from './lib/supabase'
 import { useInstallPrompt } from './lib/pwa'
 import { getAnalyticsEvents, getAnalyticsSummary, trackEvent } from './lib/analytics'
-import { useOnlineStatus, useStoredState } from './lib/storage'
+import { readStoredValue, useOnlineStatus, useStoredState, writeStoredValue } from './lib/storage'
 import type { AccountState, BetaIssueReport, Recipe, RecipeFeedback, RecipeInteraction, TonightMode, UserProfile } from './types'
 
 const filters = [
@@ -84,12 +84,21 @@ const modeOptions: Array<{
   description: string
   icon: typeof BatteryLow
 }> = [
-  { id: 'no_energy', label: 'No energy', description: 'Lowest effort, minimal dishes', icon: BatteryLow },
-  { id: 'cook_15', label: 'Cook in 15', description: 'Emergency dinner rescue', icon: Zap },
-  { id: 'post_gym', label: 'Post-gym', description: 'Fast, filling, high protein', icon: Dumbbell },
-  { id: 'use_what_i_have', label: 'Use pantry', description: 'Bias toward what you own', icon: ShoppingBasket },
-  { id: 'normal', label: 'Normal night', description: 'Best overall match', icon: ChefHat },
+  { id: 'no_energy', label: "I'm tired", description: 'No chopping, little cleanup', icon: BatteryLow },
+  { id: 'cook_15', label: "I'm hungry now", description: 'Fastest safe dinner', icon: Zap },
+  { id: 'post_gym', label: 'Protein please', description: 'Filling and higher protein', icon: Dumbbell },
 ]
+
+type CookingSession = {
+  recipeId: string
+  step: number
+  servings: number
+  timerSeconds: number
+  timerRunning: boolean
+  updatedAt: string
+}
+
+type NotificationStatus = NotificationPermission | 'unsupported'
 
 const toggleItem = (list: string[], item: string) =>
   list.includes(item) ? list.filter((value) => value !== item) : [...list, item]
@@ -476,11 +485,13 @@ function ModeSelector({
   mode: TonightMode
   onModeChange: (mode: TonightMode) => void
 }) {
+  const visibleMode = modeOptions.some((option) => option.id === mode) ? mode : 'cook_15'
+
   return (
     <section className="mode-strip" aria-labelledby="mode-title">
       <div>
-        <p className="section-label">Tonight mode</p>
-        <h2 id="mode-title">What can you manage?</h2>
+        <p className="section-label">Change the vibe</p>
+        <h2 id="mode-title">Need a different kind of dinner?</h2>
       </div>
       <div className="mode-grid">
         {modeOptions.map((option) => {
@@ -488,9 +499,10 @@ function ModeSelector({
           return (
             <button
               key={option.id}
-              className={mode === option.id ? 'mode-card active-mode' : 'mode-card'}
+              className={visibleMode === option.id ? 'mode-card active-mode' : 'mode-card'}
               type="button"
-              aria-pressed={mode === option.id}
+              aria-pressed={visibleMode === option.id}
+              aria-label={`${option.label}: ${option.description}`}
               onClick={() => onModeChange(option.id)}
             >
               <Icon aria-hidden="true" />
@@ -501,6 +513,70 @@ function ModeSelector({
         })}
       </div>
     </section>
+  )
+}
+
+function RecipeImage({ recipe, className }: { recipe: Recipe; className?: string }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <div className={className ? `image-fallback ${className}` : 'image-fallback'} role="img" aria-label={`${recipe.title} image unavailable`}>
+        <ImageOff size={22} aria-hidden="true" />
+        <span>Image saved offline? Recipe still works.</span>
+      </div>
+    )
+  }
+
+  return <img className={className} src={recipe.image} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+}
+
+function TonightPickCard({
+  recommendation,
+  easierFallback,
+  onCook,
+  onShop,
+  onView,
+}: {
+  recommendation: { recipe: Recipe; reasons: string[] }
+  easierFallback?: { recipe: Recipe; reasons: string[] }
+  onCook: (recipeId: string) => void
+  onShop: (recipeId: string) => void
+  onView: (recipeId: string) => void
+}) {
+  const { recipe, reasons } = recommendation
+
+  return (
+    <article className="tonight-pick panel" aria-labelledby="tonight-pick-title">
+      <RecipeImage recipe={recipe} />
+      <div>
+        <p className="section-label">Cookr's pick</p>
+        <h2 id="tonight-pick-title">{recipe.title}</h2>
+        <p>{reasons.slice(0, 3).join(' - ') || 'Simple, realistic, and ready for tonight.'}</p>
+        <div className="detail-stats">
+          <span>{recipe.timeMinutes} min</span>
+          <span>{recipe.activeTimeMinutes} min active</span>
+          <span>${recipe.costEstimateNzd.toFixed(2)}/serve est.</span>
+          <span>{recipe.proteinEstimateGrams}g protein</span>
+        </div>
+        <div className="top-pick-actions">
+          <button className="primary-action" type="button" onClick={() => onCook(recipe.id)}>
+            <Timer size={18} aria-hidden="true" /> Cook this
+          </button>
+          <button className="secondary-action" type="button" onClick={() => onShop(recipe.id)}>
+            <ShoppingBasket size={18} aria-hidden="true" /> Shop ingredients
+          </button>
+          <button className="text-action" type="button" onClick={() => onView(recipe.id)}>View recipe</button>
+        </div>
+        {easierFallback ? (
+          <div className="easier-pick">
+            <BatteryLow size={17} aria-hidden="true" />
+            <span>Need easier? {easierFallback.recipe.title}</span>
+            <button type="button" onClick={() => onCook(easierFallback.recipe.id)}>Use easier option</button>
+          </div>
+        ) : null}
+      </div>
+    </article>
   )
 }
 
@@ -524,7 +600,7 @@ function RecipeCard({
   return (
     <article className={selected ? 'recipe-card selected-card' : 'recipe-card'}>
       <button className="image-button" type="button" onClick={onOpen} aria-label={`View ${recipe.title}`}>
-        <img src={recipe.image} alt="" loading="lazy" decoding="async" />
+        <RecipeImage recipe={recipe} />
       </button>
       <span className="time-badge">{recipe.timeMinutes} min</span>
       <div className="recipe-body">
@@ -556,7 +632,7 @@ function RecipeCard({
           ))}
         </div>
         <div className="card-actions">
-          <button type="button" onClick={onSelect}>{selected ? 'Remove' : 'Add to plan'}</button>
+          <button type="button" onClick={onSelect}>{selected ? 'Remove from plan' : 'Plan this'}</button>
           <button type="button" onClick={onOpen}>View recipe</button>
         </div>
       </div>
@@ -677,7 +753,7 @@ function RecipeDetail({
 }) {
   return (
     <section className="detail-panel panel" aria-labelledby="recipe-title">
-      <img src={recipe.image} alt="" loading="lazy" decoding="async" />
+      <RecipeImage recipe={recipe} />
       <div>
         <p className="section-label">{recipe.cuisine}</p>
         <h2 id="recipe-title">{recipe.title}</h2>
@@ -724,17 +800,42 @@ function CookingMode({
   onComplete: () => void
   onTooHard: () => void
 }) {
-  const [step, setStep] = useState(0)
-  const [servings, setServings] = useState(recipe.servings)
+  const cookingSessionKey = `cookr.cookingSession.${recipe.id}.v1`
+  const firstStepTimer = getSuggestedTimerSeconds(recipe.instructions[0], recipe.activeTimeMinutes)
+  const savedSession = useMemo(
+    () => readStoredValue<CookingSession>(cookingSessionKey, {
+      recipeId: recipe.id,
+      step: 0,
+      servings: recipe.servings,
+      timerSeconds: firstStepTimer,
+      timerRunning: false,
+      updatedAt: '',
+    }),
+    [cookingSessionKey, firstStepTimer, recipe.id, recipe.servings],
+  )
+  const initialStep = Math.min(Math.max(savedSession.step ?? 0, 0), recipe.instructions.length - 1)
+  const [step, setStep] = useState(initialStep)
+  const [servings, setServings] = useState(Math.min(10, Math.max(1, savedSession.servings || recipe.servings)))
   const suggestedTimerSeconds = useMemo(
     () => getSuggestedTimerSeconds(recipe.instructions[step], recipe.activeTimeMinutes),
     [recipe.activeTimeMinutes, recipe.instructions, step],
   )
-  const [timerSeconds, setTimerSeconds] = useState(suggestedTimerSeconds)
-  const [timerRunning, setTimerRunning] = useState(false)
-  const [timerFinished, setTimerFinished] = useState(false)
+  const [timerSeconds, setTimerSeconds] = useState(savedSession.timerSeconds || suggestedTimerSeconds)
+  const [timerRunning, setTimerRunning] = useState(Boolean(savedSession.timerRunning))
+  const [timerFinished, setTimerFinished] = useState((savedSession.timerSeconds ?? suggestedTimerSeconds) <= 0)
+  const [notificationStatus, setNotificationStatus] = useState<NotificationStatus>(() =>
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported',
+  )
   const scale = servings / recipe.servings
   const finalStep = step === recipe.instructions.length - 1
+  const resumedSession = Boolean(savedSession.updatedAt && (initialStep > 0 || savedSession.timerSeconds !== firstStepTimer))
+  const timerHelperCopy = timerFinished
+    ? 'Check the pan before moving on.'
+    : notificationStatus === 'denied'
+      ? 'Notifications are blocked; keep this screen open for the sound.'
+      : notificationStatus === 'unsupported'
+        ? 'Keep this screen open for the timer sound.'
+        : 'Cookr will play a sound and can notify you when it finishes.'
 
   useEffect(() => {
     if (!timerRunning) return undefined
@@ -755,9 +856,25 @@ function CookingMode({
     return () => window.clearInterval(interval)
   }, [recipe.id, recipe.title, step, timerRunning])
 
+  useEffect(() => {
+    writeStoredValue<CookingSession>(cookingSessionKey, {
+      recipeId: recipe.id,
+      step,
+      servings,
+      timerSeconds,
+      timerRunning,
+      updatedAt: new Date().toISOString(),
+    })
+  }, [cookingSessionKey, recipe.id, servings, step, timerRunning, timerSeconds])
+
   const startTimer = () => {
     if ('Notification' in window && Notification.permission === 'default') {
-      void Notification.requestPermission()
+      void Notification.requestPermission().then((permission) => {
+        setNotificationStatus(permission)
+        if (permission === 'denied') trackEvent('cooking_timer_notifications_blocked', { recipeId: recipe.id })
+      })
+    } else if ('Notification' in window) {
+      setNotificationStatus(Notification.permission)
     }
     setTimerFinished(false)
     setTimerSeconds((seconds) => (seconds > 0 ? seconds : suggestedTimerSeconds))
@@ -797,6 +914,13 @@ function CookingMode({
         </label>
       </div>
 
+      {resumedSession ? (
+        <div className="trust-state" role="status">
+          <RotateCcw size={17} aria-hidden="true" />
+          Resumed where you left off. Use Reset if you want to restart this step.
+        </div>
+      ) : null}
+
       <div className="prep-checklist">
         <h3>Get this out first</h3>
         {recipe.ingredients.slice(0, 5).map((ingredient) => (
@@ -826,7 +950,7 @@ function CookingMode({
           <div>
             <Timer size={18} aria-hidden="true" />
             <strong>{timerFinished ? 'Timer done' : 'Step timer'}</strong>
-            <span>{timerFinished ? 'Check the pan before moving on.' : 'Cookr will play a sound when it finishes.'}</span>
+            <span>{timerHelperCopy}</span>
           </div>
           <div className="timer-controls" aria-label="Step timer controls">
             <button type="button" onClick={() => adjustTimer(-60)} aria-label="Remove one minute">
@@ -889,11 +1013,13 @@ function ShoppingList({
   onFindRecipes: () => void
   onCook: (recipeId: string) => void
 }) {
+  const online = useOnlineStatus()
   const [checked, setChecked] = useStoredState<Record<string, boolean>>('cookr.grocery.checked.v1', {})
   const baseLines = useMemo(() => buildGroceryList(selectedRecipes, profile.pantryItems), [selectedRecipes, profile.pantryItems])
   const lines = baseLines.map((line) => ({ ...line, checked: checked[line.name] ?? line.checked }))
   const total = estimateBasketTotal(lines)
   const confidence = getBasketPriceConfidence(lines)
+  const lowConfidenceCount = lines.filter((line) => line.match.confidence === 'low').length
   const groupedLines = lines.reduce<Record<string, typeof lines>>((groups, line) => {
     groups[line.category] = groups[line.category] ? [...groups[line.category], line] : [line]
     return groups
@@ -938,6 +1064,12 @@ function ShoppingList({
         Links open user-controlled Woolworths NZ searches. Prices are estimates; Cookr does not scrape result
         pages or automate checkout.
       </p>
+      {!online ? (
+        <div className="trust-state" role="status">
+          <WifiOff size={17} aria-hidden="true" />
+          You are offline. This list is saved here, but Woolworths links need internet.
+        </div>
+      ) : null}
       <div className="price-confidence">
         <PackageCheck aria-hidden="true" />
         <div>
@@ -946,6 +1078,12 @@ function ShoppingList({
         </div>
         <small>{confidence.high} high / {confidence.medium} medium / {confidence.low} low</small>
       </div>
+      {lowConfidenceCount ? (
+        <div className="trust-state">
+          <AlertCircle size={17} aria-hidden="true" />
+          {lowConfidenceCount} item{lowConfidenceCount === 1 ? '' : 's'} need manual checking. Open the Woolworths search and choose the pack that suits your budget and diet.
+        </div>
+      ) : null}
       <div className="grocery-list">
         {Object.entries(groupedLines).map(([category, categoryLines]) => (
           <section className="aisle-group" key={category} aria-label={category}>
@@ -966,6 +1104,7 @@ function ShoppingList({
                 <a href={line.match.searchUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('product_link_opened', { ingredient: line.name, confidence: line.match.confidence })}>
                   {line.match.name}
                   <small>{line.match.size} - {line.match.confidence} match</small>
+                  {line.match.confidence === 'low' ? <small>No curated match yet. Choose manually.</small> : null}
                 </a>
               </div>
             ))}
@@ -1182,18 +1321,32 @@ function BetaFeedbackPanel({
 function GettingStartedCard({
   selectedCount,
   cookedMeals,
-  onPlan,
+  onNext,
 }: {
   selectedCount: number
   cookedMeals: number
-  onPlan: () => void
+  onNext: () => void
 }) {
   const completedSteps = Math.min(5, 1 + (selectedCount > 0 ? 1 : 0) + (cookedMeals > 0 ? 1 : 0))
+  const nextStep = selectedCount === 0
+    ? {
+      title: 'Shop one dinner',
+      body: "We'll add the pick above and make the smallest useful list.",
+    }
+    : cookedMeals === 0
+      ? {
+        title: 'Start cooking',
+        body: 'Open one-step cooking mode and follow the timer prompts.',
+      }
+      : {
+        title: 'Reset the week',
+        body: 'Choose what repeats and what should change next shop.',
+      }
 
   return (
-    <button className="getting-started-card" type="button" onClick={onPlan}>
+    <button className="getting-started-card" type="button" onClick={onNext}>
       <div>
-        <strong>Getting started</strong>
+        <strong>Your next step</strong>
         <span>{completedSteps} of 5 steps</span>
       </div>
       <div className="mini-progress" aria-hidden="true">
@@ -1202,8 +1355,8 @@ function GettingStartedCard({
         ))}
       </div>
       <div>
-        <strong>Plan a meal</strong>
-        <small>Pick a recipe and add it to your plan.</small>
+        <strong>{nextStep.title}</strong>
+        <small>{nextStep.body}</small>
       </div>
       <ChevronRight size={18} aria-hidden="true" />
     </button>
@@ -1255,7 +1408,7 @@ function HomeWeekStrip({
             onClick={() => onOpen(slot.recipe.id)}
           >
             <span>{day}{index === 0 ? ' Tonight' : ''}</span>
-            <img src={slot.recipe.image} alt="" loading="lazy" decoding="async" />
+            <RecipeImage recipe={slot.recipe} />
           </button>
         ))}
       </div>
@@ -1346,7 +1499,7 @@ function App() {
   const [view, setView] = useStoredState<'home' | 'plan' | 'shopping' | 'cook' | 'learn'>('cookr.view.v1', 'home')
   const [mode, setMode] = useStoredState<TonightMode>('cookr.mode.v1', 'cook_15')
   const [searchTerm, setSearchTerm] = useState('')
-  const [isStarting, setIsStarting] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [visibleRecipeCount, setVisibleRecipeCount] = useState(12)
   const previousViewRef = useRef(view)
   const cookingCompletedRef = useRef(false)
@@ -1468,6 +1621,12 @@ function App() {
     trackEvent(selectedIds.includes(recipeId) ? 'recipe_removed_from_plan' : 'recipe_added_to_plan', { recipeId })
   }
 
+  const shopRecipe = (recipeId: string) => {
+    if (!selectedIds.includes(recipeId)) setSelectedIds([...selectedIds, recipeId])
+    setView('shopping')
+    trackEvent('shop_single_recipe_clicked', { recipeId, alreadyPlanned: selectedIds.includes(recipeId) })
+  }
+
   const addWeeklyPlan = () => {
     const weekIds = weeklyPlan.map((slot) => slot.recipe.id)
     const nextIds = Array.from(new Set([...selectedIds, ...weekIds]))
@@ -1492,10 +1651,8 @@ function App() {
       repeat: Boolean(current?.cookedCount),
       selectedCount: selectedIds.length,
     })
-    setIsStarting(true)
     setActiveRecipeId(recipeId)
     window.setTimeout(() => {
-      setIsStarting(false)
       setView('cook')
       trackEvent('cooking_started', { recipeId, mode })
     }, 180)
@@ -1511,6 +1668,14 @@ function App() {
     }))
     setRecentCookedRecipeId(activeRecipe.id)
     cookingCompletedRef.current = true
+    writeStoredValue<CookingSession>(`cookr.cookingSession.${activeRecipe.id}.v1`, {
+      recipeId: activeRecipe.id,
+      step: 0,
+      servings: activeRecipe.servings,
+      timerSeconds: getSuggestedTimerSeconds(activeRecipe.instructions[0], activeRecipe.activeTimeMinutes),
+      timerRunning: false,
+      updatedAt: '',
+    })
     trackEvent('cooking_completed', { recipeId: activeRecipe.id, repeat })
     if (repeat) trackEvent('repeat_recipe_cooked', { recipeId: activeRecipe.id })
     setView('home')
@@ -1572,7 +1737,7 @@ function App() {
                 </h1>
                 {topRecommendation ? (
                   <p>
-                    You've got this. We'll guide you.
+                    One realistic pick first. Browse only if you want to.
                   </p>
                 ) : (
                   <p>
@@ -1580,20 +1745,36 @@ function App() {
                     appliance so Cookr can make a realistic plan.
                   </p>
                 )}
-                <div className="hero-actions">
-                  {topRecommendation ? (
-                    <button className="primary-action" type="button" onClick={() => handleStartCooking(topRecommendation.recipe.id)}>
-                      {isStarting ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Timer size={18} aria-hidden="true" />}
-                      Start cooking
-                    </button>
-                  ) : (
+                {topRecommendation ? (
+                  <TonightPickCard
+                    recommendation={topRecommendation}
+                    easierFallback={easierFallback}
+                    onCook={handleStartCooking}
+                    onShop={shopRecipe}
+                    onView={openRecipe}
+                  />
+                ) : (
+                  <div className="hero-actions">
                     <button className="primary-action" type="button" onClick={() => setOnboarded(false)}>
                       Edit setup
                     </button>
-                  )}
-                  <button className="secondary-action" type="button" onClick={() => setView('shopping')}>Build grocery list</button>
-                </div>
-                <GettingStartedCard selectedCount={selectedRecipes.length} cookedMeals={cookedMeals} onPlan={() => setView('plan')} />
+                  </div>
+                )}
+                <GettingStartedCard
+                  selectedCount={selectedRecipes.length}
+                  cookedMeals={cookedMeals}
+                  onNext={() => {
+                    if (!selectedRecipes.length) {
+                      if (topRecommendation) shopRecipe(topRecommendation.recipe.id)
+                      return
+                    }
+                    if (!cookedMeals) {
+                      handleStartCooking(selectedRecipes[0].id)
+                      return
+                    }
+                    setView('plan')
+                  }}
+                />
               </div>
               <div className="quick-plan panel">
                 <Sparkles aria-hidden="true" />
@@ -1660,42 +1841,60 @@ function App() {
             <section className="filter-section panel">
               <div className="section-heading">
                 <div>
-                  <p className="section-label">Recommended recipes</p>
-                  <h2>Choose from realistic options</h2>
+                  <p className="section-label">More options</p>
+                  <h2>Browse only if tonight's pick is wrong</h2>
                 </div>
-                <label className="search-box">
-                  <Search size={16} aria-hidden="true" />
-                  <input
-                    value={searchTerm}
-                    placeholder="Search meals or ingredients"
-                    onChange={(event) => {
-                      setSearchTerm(event.target.value)
-                      setVisibleRecipeCount(12)
-                    }}
-                  />
-                </label>
+                <button className="secondary-action" type="button" onClick={() => setShowAdvancedFilters((value) => !value)}>
+                  {showAdvancedFilters ? 'Hide filters' : 'More filters'}
+                </button>
               </div>
-              <div className="filter-drawer">
-                {filters.map((filter) => (
-                  <button
-                    aria-pressed={activeFilters.includes(filter)}
-                    className={activeFilters.includes(filter) ? 'chip active' : 'chip'}
-                    key={filter}
-                    type="button"
-                    onClick={() => {
-                      const nextFilters = toggleItem(activeFilters, filter)
-                      setActiveFilters(nextFilters)
-                      setVisibleRecipeCount(12)
-                      trackEvent('recipe_filter_toggled', { filter, active: nextFilters.includes(filter), filterCount: nextFilters.length })
-                      if (['vegetarian', 'healthy', 'high protein'].includes(filter)) {
-                        trackEvent('dietary_filter_used', { filter })
-                      }
-                    }}
-                  >
-                    {filter}
+              {(activeFilters.length || searchTerm.trim()) ? (
+                <div className="filter-summary">
+                  <span>{searchedRecipes.length} meals match your current search and filters.</span>
+                  <button type="button" onClick={() => {
+                    setActiveFilters([])
+                    setSearchTerm('')
+                  }}>
+                    Clear
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : null}
+              {showAdvancedFilters ? (
+                <div className="advanced-filter-panel">
+                  <label className="search-box">
+                    <Search size={16} aria-hidden="true" />
+                    <input
+                      value={searchTerm}
+                      placeholder="Search meals or ingredients"
+                      onChange={(event) => {
+                        setSearchTerm(event.target.value)
+                        setVisibleRecipeCount(12)
+                      }}
+                    />
+                  </label>
+                  <div className="filter-drawer">
+                    {filters.map((filter) => (
+                      <button
+                        aria-pressed={activeFilters.includes(filter)}
+                        className={activeFilters.includes(filter) ? 'chip active' : 'chip'}
+                        key={filter}
+                        type="button"
+                        onClick={() => {
+                          const nextFilters = toggleItem(activeFilters, filter)
+                          setActiveFilters(nextFilters)
+                          setVisibleRecipeCount(12)
+                          trackEvent('recipe_filter_toggled', { filter, active: nextFilters.includes(filter), filterCount: nextFilters.length })
+                          if (['vegetarian', 'healthy', 'high protein'].includes(filter)) {
+                            trackEvent('dietary_filter_used', { filter })
+                          }
+                        }}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </section>
 
             {searchedRecipes.length ? (
@@ -1726,8 +1925,11 @@ function App() {
             ) : (
               <EmptyState
                 title="No realistic match with those filters"
-                body="Drop one filter or switch to No energy mode. Cookr will keep the decision small."
-                action={{ label: 'Clear filters', onClick: () => setActiveFilters([]) }}
+                body="Those filters leave Cookr without a safe dinner. Clear them and start from one realistic pick again."
+                action={{ label: 'Clear filters', onClick: () => {
+                  setActiveFilters([])
+                  setSearchTerm('')
+                } }}
               />
             )}
 
