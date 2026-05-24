@@ -45,17 +45,21 @@ export const buildWeeklyPlan = (
 ): WeeklyPlanSlot[] => {
   if (!ranked.length) return []
 
-  const recentRepeatIds = new Set(interactions.filter((interaction) => interaction.wouldRepeat).map((interaction) => interaction.recipeId))
+  const recentRepeatIds = new Set(
+    interactions
+      .filter((interaction) => (interaction.cookedCount ?? 0) > 0 && interaction.wouldRepeat !== false)
+      .map((interaction) => interaction.recipeId),
+  )
   const top = ranked[0].recipe
-  const repeat = firstRecipe(ranked, (recipe) => recentRepeatIds.has(recipe.id), 1)
+  const repeat = ranked.find(({ recipe }) => recentRepeatIds.has(recipe.id))?.recipe
   const rescue = firstRecipe(ranked, (recipe) => recipe.timeMinutes <= 15 || recipe.effortScore <= 1, 1)
   const batch = firstRecipe(ranked, (recipe) => recipe.tags.includes('meal prep') || recipe.servings >= Math.max(4, profile.householdSize), 2)
-  const selected = [top, repeat, rescue, batch].filter(Boolean)
+  const selected = [top, repeat, rescue, batch].filter((recipe): recipe is Recipe => Boolean(recipe))
   const overlap = firstRecipe(ranked, (recipe) => sharesIngredientWith(recipe, selected) && !selected.some((item) => item.id === recipe.id), 3)
 
   return uniqueByRecipe([
-    { id: 'tonight', label: 'Tonight', recipe: top, reason: 'Best fit for your current mode' },
-    { id: 'repeat', label: 'Cook again', recipe: repeat, reason: recentRepeatIds.has(repeat.id) ? 'A trusted repeat' : 'Reliable low-friction backup' },
+    { id: 'tonight', label: 'Tonight', recipe: top, reason: 'Best for your current mode' },
+    ...(repeat ? [{ id: 'repeat', label: 'Cook again', recipe: repeat, reason: 'A trusted repeat you have cooked before' }] : []),
     { id: 'rescue', label: '15-min rescue', recipe: rescue, reason: 'For the night that tries to become delivery' },
     { id: 'batch', label: 'Batch cook', recipe: batch, reason: 'Covers leftovers or family portions' },
     { id: 'overlap', label: 'Use it up', recipe: overlap, reason: 'Keeps the shop smaller by reusing ingredients' },

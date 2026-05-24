@@ -98,7 +98,7 @@ export const scoreRecipe = (recipe: Recipe, profile: UserProfile, context = make
   const desiredTime = timeLimit[profile.time]
   if (recipe.timeMinutes <= desiredTime) {
     score += 22
-    reasons.push(`fits ${profile.time}`)
+    reasons.push(profile.time)
   } else {
     score -= Math.min(22, recipe.timeMinutes - desiredTime)
   }
@@ -132,10 +132,10 @@ export const scoreRecipe = (recipe: Recipe, profile: UserProfile, context = make
   }
   if (goalText.includes('reduce takeaways')) {
     score += recipe.tags.includes('fakeaway') ? 16 : 8
-    reasons.push(recipe.tags.includes('fakeaway') ? `${recipe.takeawayReplacement} takeaway swap` : 'takeaway-safe fallback')
+    reasons.push(recipe.tags.includes('fakeaway') ? 'familiar favourite' : 'easy fallback')
   } else if (recipe.tags.includes('fakeaway')) {
     score += 8
-    reasons.push('takeaway-style')
+    reasons.push('familiar favourite')
   }
   if (goalText.includes('family meals') && recipe.takeawayReplacement === 'comfort food') {
     score += 45

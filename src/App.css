@@ -24,7 +24,7 @@ button:disabled {
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 18px;
   box-shadow: var(--shadow);
 }
 
@@ -44,17 +44,18 @@ button:disabled {
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  inset: 0 auto 0 0;
   z-index: 10;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: calc(14px + env(safe-area-inset-top)) 24px 14px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(18px);
+  width: 168px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 28px;
+  padding: calc(34px + env(safe-area-inset-top)) 26px 24px;
+  background: rgba(255, 255, 255, 0.94);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(20px);
 }
 
 .brand,
@@ -75,16 +76,20 @@ button:disabled {
 
 .brand {
   gap: 8px;
-  color: var(--text-h);
-  font-weight: 800;
+  color: var(--tomato);
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
   text-decoration: none;
 }
 
 .topbar nav {
-  gap: 4px;
-  padding: 3px;
-  background: var(--soft);
-  border-radius: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 
 .topbar nav button,
@@ -100,18 +105,23 @@ button:disabled {
 }
 
 .topbar nav button {
-  min-width: 74px;
-  padding: 8px 12px;
-  font-size: 0.88rem;
-  font-weight: 700;
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  font-size: 0.94rem;
+  font-weight: 750;
+  text-align: left;
 }
 
 .active-nav,
 .topbar nav button:hover,
 .bottom-nav button:hover {
-  background: var(--surface) !important;
+  background: var(--green-soft) !important;
   color: var(--text-h) !important;
-  box-shadow: 0 1px 6px rgba(17, 24, 39, 0.08);
+  box-shadow: none;
 }
 
 .icon-button {
@@ -121,40 +131,46 @@ button:disabled {
   place-items: center;
 }
 
+.recipe-card .icon-button {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--tomato);
+  box-shadow: 0 4px 12px rgba(16, 24, 32, 0.12);
+}
+
 .saved {
   color: var(--tomato);
-  background: var(--tomato-soft);
+  background: white;
 }
 
 main {
-  width: min(1160px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 24px 0 calc(104px + env(safe-area-inset-bottom));
+  width: min(980px, calc(100% - 220px));
+  margin: 0 auto 0 calc(168px + clamp(32px, 5vw, 70px));
+  padding: 58px 0 calc(80px + env(safe-area-inset-bottom));
 }
 
 .mode-strip {
   display: grid;
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin: 0 0 20px;
 }
 
 .mode-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .mode-card {
-  min-height: 96px;
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  padding: 14px;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--text);
-  text-align: left;
+  text-align: center;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
@@ -168,6 +184,8 @@ main {
 
 .mode-card svg {
   color: var(--green);
+  width: 17px;
+  height: 17px;
 }
 
 .mode-card span {
@@ -176,26 +194,25 @@ main {
 }
 
 .mode-card small {
-  color: var(--muted);
-  line-height: 1.25;
+  display: none;
 }
 
 .active-mode {
   border-color: var(--green);
-  background: color-mix(in srgb, var(--green-soft) 84%, var(--surface));
-  box-shadow: inset 0 0 0 1px var(--green);
+  background: var(--green-soft);
+  box-shadow: none;
 }
 
 .hero-band {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 26px;
   align-items: stretch;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .hero-band > div:first-child {
-  padding: 36px 0;
+  padding: 28px 0 0;
 }
 
 h1,
@@ -207,9 +224,10 @@ h3 {
 
 h1 {
   max-width: 680px;
-  margin: 0 0 14px;
-  font-size: clamp(2.25rem, 4.6vw, 4.6rem);
-  line-height: 1;
+  margin: 0 0 8px;
+  font-size: clamp(2.25rem, 4vw, 3.35rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
 }
 
 h2 {
@@ -229,7 +247,7 @@ p {
 
 .hero-band p {
   max-width: 650px;
-  font-size: 1.12rem;
+  font-size: 1.08rem;
 }
 
 .hero-actions {
@@ -264,9 +282,10 @@ p {
 }
 
 .quick-plan {
-  padding: 22px;
+  padding: 24px;
   display: grid;
   gap: 14px;
+  align-self: end;
 }
 
 .quick-plan svg,
@@ -314,6 +333,137 @@ p {
   flex-wrap: wrap;
 }
 
+.getting-started-card {
+  position: relative;
+  width: min(560px, 100%);
+  min-height: 122px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 14px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(237, 248, 240, 0.96), rgba(255, 255, 255, 0.96));
+  color: var(--text-h);
+  text-align: left;
+  box-shadow: var(--shadow);
+}
+
+.getting-started-card > div {
+  display: grid;
+  gap: 3px;
+}
+
+.getting-started-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  grid-column: 1 / -1;
+  color: var(--text-h);
+}
+
+.getting-started-card small,
+.getting-started-card span {
+  color: var(--muted);
+}
+
+.mini-progress {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px !important;
+}
+
+.mini-progress span {
+  height: 7px;
+  border-radius: 999px;
+  background: #d7e5dc;
+}
+
+.mini-progress .done {
+  background: var(--green);
+}
+
+.woolworths-card {
+  width: 100%;
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0;
+  padding: 16px 20px;
+  color: var(--text-h);
+  text-align: left;
+}
+
+.woolworths-card > span {
+  width: 52px;
+  height: 52px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 2rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.woolworths-card div {
+  display: grid;
+  gap: 3px;
+}
+
+.woolworths-card small {
+  color: var(--muted);
+}
+
+.home-week {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 22px;
+}
+
+.home-week .section-heading {
+  margin-bottom: 0;
+}
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(78px, 1fr));
+  gap: 10px;
+}
+
+.day-pill {
+  min-height: 92px;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 9px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-h);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.day-pill.active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green-strong);
+}
+
+.day-pill img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(16, 24, 32, 0.13);
+}
+
 .shopping-summary {
   justify-content: flex-end;
 }
@@ -336,8 +486,11 @@ p {
 }
 
 .filter-section {
-  padding: 18px;
+  padding: 0;
   margin-bottom: 18px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .section-heading {
@@ -397,14 +550,29 @@ p {
 }
 
 .recipe-card {
+  position: relative;
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 16px;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
     box-shadow 160ms ease;
+}
+
+.time-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-h);
+  font-size: 0.78rem;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(16, 24, 32, 0.1);
 }
 
 .recipe-card img,
@@ -427,9 +595,9 @@ p {
 }
 
 .recipe-body {
-  padding: 14px;
+  padding: 12px 14px 14px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .recipe-body h3 {
@@ -438,15 +606,21 @@ p {
 }
 
 .card-topline {
-  justify-content: space-between;
-  gap: 8px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+}
+
+.card-topline > span {
+  display: none;
 }
 
 .meta-row {
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.86rem;
-  font-weight: 800;
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
 .meta-row span {
@@ -458,11 +632,11 @@ p {
 .recipe-body p,
 .helper-copy {
   color: var(--muted);
-  font-size: 0.94rem;
+  font-size: 0.86rem;
 }
 
 .effort-meter {
-  display: flex;
+  display: none;
   gap: 4px;
 }
 
@@ -934,14 +1108,59 @@ p {
 }
 
 .timer-strip {
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 12px;
   color: var(--green-strong);
 }
 
+.timer-strip > div:first-child {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+}
+
 .timer-strip span {
+  grid-column: 2;
   color: var(--muted);
   font-weight: 700;
+}
+
+.timer-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(84px, 1fr) 44px minmax(96px, auto) minmax(96px, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.timer-controls button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--soft);
+  color: var(--text-h);
+  font-weight: 850;
+}
+
+.timer-controls output {
+  color: var(--text-h);
+  font-size: 1.35rem;
+  font-weight: 850;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-controls .timer-play {
+  background: var(--green);
+  color: white;
 }
 
 .step-actions {
@@ -1200,12 +1419,33 @@ input[type='checkbox'] {
 }
 
 @media (max-width: 900px) {
+  .topbar {
+    position: sticky;
+    inset: auto;
+    top: 0;
+    width: auto;
+    min-height: 68px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: calc(14px + env(safe-area-inset-top)) 18px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    font-size: 1.18rem;
+    letter-spacing: -0.02em;
+  }
+
   .topbar nav {
     display: none;
   }
 
   main {
     width: min(100% - 24px, 720px);
+    margin: 0 auto;
     padding-top: 16px;
   }
 
@@ -1227,9 +1467,43 @@ input[type='checkbox'] {
     padding: 12px 0;
   }
 
+  .quick-plan,
+  .fallback-strip {
+    display: none;
+  }
+
+  .week-strip {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .day-pill {
+    flex: 0 0 74px;
+    scroll-snap-align: start;
+  }
+
   .recipe-grid,
   .insights-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding: 2px 2px 8px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .recipe-card {
+    flex: 0 0 min(230px, 76vw);
+    scroll-snap-align: start;
+  }
+
+  .insights-grid {
+    display: grid;
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .grocery-row {
@@ -1242,6 +1516,7 @@ input[type='checkbox'] {
 
   .mode-grid {
     display: flex;
+    flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 4px;
     scroll-snap-type: x proximity;
@@ -1249,7 +1524,8 @@ input[type='checkbox'] {
   }
 
   .mode-card {
-    min-width: 180px;
+    flex: 0 0 auto;
+    min-width: auto;
     scroll-snap-align: start;
   }
 
@@ -1286,7 +1562,7 @@ input[type='checkbox'] {
     bottom: max(12px, env(safe-area-inset-bottom));
     z-index: 12;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 4px;
     padding: 6px;
     background: color-mix(in srgb, var(--bg) 92%, transparent);
@@ -1357,8 +1633,27 @@ input[type='checkbox'] {
   }
 
   .mode-card {
-    min-width: 158px;
-    min-height: 94px;
+    min-width: auto;
+    min-height: 42px;
+  }
+
+  .getting-started-card {
+    min-height: 118px;
+    padding: 16px;
+  }
+
+  .woolworths-card {
+    grid-template-columns: auto 1fr auto;
+    padding: 14px;
+  }
+
+  .timer-controls {
+    grid-template-columns: 42px minmax(72px, 1fr) 42px;
+  }
+
+  .timer-controls .timer-play,
+  .timer-controls button:last-child {
+    grid-column: span 3;
   }
 
   .hero-actions,
@@ -1371,6 +1666,10 @@ input[type='checkbox'] {
     display: grid;
     grid-template-columns: 1fr;
     justify-items: stretch;
+  }
+
+  .hero-actions .secondary-action {
+    display: none;
   }
 
   .primary-action,
@@ -1393,7 +1692,6 @@ input[type='checkbox'] {
   }
 
   .feedback-strip,
-  .fallback-strip,
   .price-confidence {
     display: grid;
     justify-items: start;
