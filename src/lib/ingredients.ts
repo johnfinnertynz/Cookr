@@ -11,6 +11,11 @@ const aliasMap: Record<string, string> = {
   'mini wraps': 'tortilla wraps',
   'pita breads': 'pita bread',
   'tuna in springwater': 'canned tuna',
+  'frozen mixed vegetables': 'mixed vegetables',
+  'satay simmer sauce': 'satay simmer sauce',
+  'mild curry powder': 'curry powder',
+  'beef sausages': 'sausages',
+  'baby potatoes': 'potatoes',
 }
 
 const unitMap: Record<string, { unit: string; factor: number }> = {

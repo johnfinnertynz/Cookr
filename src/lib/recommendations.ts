@@ -41,13 +41,32 @@ const parsePantry = (pantryItems: string) =>
 const getInteraction = (recipeId: string, interactions: RecipeInteraction[] = []) =>
   interactions.find((interaction) => interaction.recipeId === recipeId)
 
+const getRequiredAppliances = (recipe: Recipe) => {
+  const primaryAppliances = recipe.appliances.filter((appliance) => appliance !== 'microwave')
+  return primaryAppliances.length ? primaryAppliances : recipe.appliances
+}
+
+export const recipeMeetsHardConstraints = (recipe: Recipe, profile: UserProfile) => {
+  if (profile.dietaries.includes('vegetarian') && !recipe.tags.includes('vegetarian')) return false
+  if (profile.dietaries.includes('vegan') && !recipe.tags.includes('vegan')) return false
+  const requiredAppliances = getRequiredAppliances(recipe)
+  if (
+    profile.appliances.length > 0 &&
+    requiredAppliances.length > 0 &&
+    requiredAppliances.some((appliance) => !profile.appliances.includes(appliance))
+  ) {
+    return false
+  }
+  return true
+}
+
 const modeScore = (recipe: Recipe, mode: TonightMode) => {
   if (mode === 'no_energy') {
     return (recipe.effortScore <= 1 ? 26 : 0) + (recipe.cleanupLevel === 'low' ? 10 : 0) - recipe.activeTimeMinutes
   }
   if (mode === 'cook_15') return recipe.timeMinutes <= 15 ? 28 : -Math.min(24, recipe.timeMinutes - 15)
   if (mode === 'post_gym') return recipe.proteinEstimateGrams >= 30 ? 24 : 0
-  if (mode === 'use_what_i_have') return 0
+  if (mode === 'use_what_i_have') return recipe.tags.includes('pantry') ? 16 : 0
   return recipe.tags.includes('fakeaway') ? 8 : 0
 }
 
@@ -86,6 +105,9 @@ export const scoreRecipe = (recipe: Recipe, profile: UserProfile, context = make
   } else {
     score -= 20
   }
+  if (profile.confidence === 'complete beginner' && recipe.difficulty === 'complete beginner') score += 14
+  if (profile.confidence === 'complete beginner' && recipe.effortScore <= 1) score += 10
+  if (profile.confidence === 'complete beginner' && recipe.difficulty !== 'complete beginner') score -= 12
 
   const styleHits = profile.styles.filter((style) => recipe.tags.includes(style) || recipe.appliances.includes(style))
   score += styleHits.length * 10
@@ -108,28 +130,47 @@ export const scoreRecipe = (recipe: Recipe, profile: UserProfile, context = make
     score += 12
     reasons.push(`${recipe.takeawayReplacement} fakeaway`)
   }
+  if (goalText.includes('family meals') && recipe.takeawayReplacement === 'comfort food') {
+    score += 45
+    reasons.push('family comfort meal')
+  }
 
   score += modeScore(recipe, context.mode)
   if (context.mode === 'no_energy' && recipe.effortScore <= 1) reasons.push('low-energy friendly')
   if (context.mode === 'cook_15' && recipe.timeMinutes <= 15) reasons.push('15-minute rescue')
   if (context.mode === 'post_gym' && recipe.proteinEstimateGrams >= 30) reasons.push('post-gym protein')
 
-  if (profile.budget === 'tight' && recipe.costEstimateNzd > 5.5) score -= 12
-  if (profile.dietaries.includes('vegetarian') && !recipe.tags.includes('vegetarian')) score -= 35
-  if (profile.dietaries.includes('vegan') && !recipe.tags.includes('vegan')) score -= 50
+  if (profile.budget === 'tight' && recipe.costEstimateNzd <= 3.5) {
+    score += 18
+    reasons.push('student-budget friendly')
+  }
+  if (profile.budget === 'tight' && recipe.costEstimateNzd > 5.5) score -= 28
+  if (profile.dietaries.includes('vegetarian') && !recipe.tags.includes('vegetarian')) score -= 120
+  if (profile.dietaries.includes('vegan') && !recipe.tags.includes('vegan')) score -= 140
+  if (profile.scheduleType === 'student' && recipe.tags.includes('cheap')) score += 18
+  if (profile.scheduleType === 'shift_worker' && (recipe.timeMinutes <= 20 || recipe.tags.includes('meal prep'))) score += 16
+  if (profile.scheduleType === 'family' && recipe.tags.includes('family-friendly')) score += 30
+  if ((profile.scheduleType === 'family' || profile.householdSize >= 4) && recipe.servings >= 4) score += 14
+  if (profile.scheduleType === 'gym' && recipe.proteinEstimateGrams >= 30) score += 18
 
   const disliked = profile.dislikes
     .toLowerCase()
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
-  if (disliked.some((item) => recipe.ingredients.some((ingredient) => ingredient.name.includes(item)))) {
+  if (disliked.some((item) =>
+    recipe.ingredients.some((ingredient) => ingredient.name.includes(item) || ingredient.canonicalName?.includes(item)) ||
+    recipe.title.toLowerCase().includes(item) ||
+    recipe.takeawayReplacement.includes(item) ||
+    (item === 'spicy' && ['curry', 'chilli', 'satay'].some((word) => `${recipe.title} ${recipe.takeawayReplacement} ${recipe.cuisine}`.toLowerCase().includes(word)))
+  )) {
     score -= 60
     reasons.push('contains a disliked ingredient')
   }
 
-  const missingAppliances = recipe.appliances.filter((appliance) => !profile.appliances.includes(appliance))
-  score -= missingAppliances.length * 18
+  const missingAppliances = getRequiredAppliances(recipe).filter((appliance) => !profile.appliances.includes(appliance))
+  score -= missingAppliances.length * 34
+  if (missingAppliances.length === recipe.appliances.length && recipe.appliances.length > 0) score -= 28
 
   const pantryHits = recipe.ingredients.filter((ingredient) =>
     context.pantryItems.some((item) => ingredient.name.includes(item) || ingredient.canonicalName?.includes(item)),
@@ -156,6 +197,7 @@ export const scoreRecipe = (recipe: Recipe, profile: UserProfile, context = make
 
 export const getRankedRecipes = (profile: UserProfile, context = makeRecommendationContext(profile)) =>
   recipes
+    .filter((recipe) => recipeMeetsHardConstraints(recipe, profile))
     .map((recipe) => ({ recipe, ...scoreRecipe(recipe, profile, context) }))
     .sort((a, b) => b.score - a.score)
 

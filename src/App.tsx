@@ -31,6 +31,7 @@ import {
   getIngredientOverlapScore,
   getRankedRecipes,
   makeRecommendationContext,
+  recipeMeetsHardConstraints,
 } from './lib/recommendations'
 import { trackEvent } from './lib/analytics'
 import { useOnlineStatus, useStoredState } from './lib/storage'
@@ -75,6 +76,12 @@ const modeOptions: Array<{
 
 const toggleItem = (list: string[], item: string) =>
   list.includes(item) ? list.filter((value) => value !== item) : [...list, item]
+
+const toggleDietary = (list: string[], item: string) => {
+  if (item === 'no restrictions') return list.includes(item) ? [] : ['no restrictions']
+  const next = toggleItem(list.filter((value) => value !== 'no restrictions'), item)
+  return next.length ? next : ['no restrictions']
+}
 
 const updateInteraction = (
   interactions: RecipeInteraction[],
@@ -254,7 +261,7 @@ function Onboarding({
                 aria-pressed={profile.dietaries.includes(option)}
                 className={profile.dietaries.includes(option) ? 'chip active' : 'chip'}
                 key={option}
-                onClick={() => setProfile({ ...profile, dietaries: toggleItem(profile.dietaries, option) })}
+                onClick={() => setProfile({ ...profile, dietaries: toggleDietary(profile.dietaries, option) })}
                 type="button"
               >
                 {option}
@@ -392,14 +399,14 @@ function RecipeCard({
           <span>${recipe.costEstimateNzd.toFixed(2)}/serve</span>
           <span>{recipe.proteinEstimateGrams}g protein</span>
         </div>
-        <p>{reasons.length ? reasons.join(' · ') : 'Solid Cookr match'} · {Math.round(score)} fit</p>
+        <p>{reasons.length ? reasons.join(' - ') : 'Solid Cookr match'} - {Math.round(score)} fit</p>
         <div className="effort-meter" aria-label={`Effort ${recipe.effortScore} out of 5`}>
           {Array.from({ length: 5 }).map((_, index) => (
             <span className={index < recipe.effortScore ? 'filled' : ''} key={index} />
           ))}
         </div>
         <div className="card-actions">
-          <button type="button" onClick={onSelect}>{selected ? 'In plan' : 'Add to plan'}</button>
+          <button type="button" onClick={onSelect}>{selected ? 'Remove' : 'Add to plan'}</button>
           <button type="button" onClick={onOpen}>View recipe</button>
         </div>
       </div>
@@ -430,10 +437,12 @@ function RecipeDetail({
   recipe,
   onCook,
   onAdd,
+  isInPlan,
 }: {
   recipe: Recipe
   onCook: () => void
   onAdd: () => void
+  isInPlan: boolean
 }) {
   return (
     <section className="detail-panel panel" aria-labelledby="recipe-title">
@@ -463,7 +472,7 @@ function RecipeDetail({
           ))}
         </ul>
         <div className="detail-actions">
-          <button className="secondary-action" type="button" onClick={onAdd}>Add to plan</button>
+          <button className="secondary-action" type="button" onClick={onAdd}>{isInPlan ? 'Remove from plan' : 'Add to plan'}</button>
           <button className="primary-action" type="button" onClick={onCook}>
             Start cooking <Timer size={18} aria-hidden="true" />
           </button>
@@ -614,12 +623,12 @@ function ShoppingList({
                   />
                   <span>
                     <strong>{line.name}</strong>
-                    <small>{line.displayQuantity} · {line.confidenceNote}{line.pantry ? ' · pantry' : ''}</small>
+                    <small>{line.displayQuantity} - {line.confidenceNote}{line.pantry ? ' - pantry' : ''}</small>
                   </span>
                 </label>
                 <a href={line.match.searchUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('product_link_opened', { ingredient: line.name, confidence: line.match.confidence })}>
                   {line.match.name}
-                  <small>{line.match.size} · {line.match.confidence} match</small>
+                  <small>{line.match.size} - {line.match.confidence} match</small>
                 </a>
               </div>
             ))}
@@ -634,7 +643,7 @@ function App() {
   const online = useOnlineStatus()
   const [profile, setProfile] = useStoredState<UserProfile>('cookr.profile.v2', defaultProfile)
   const [onboarded, setOnboarded] = useStoredState('cookr.onboarded.v1', false)
-  const [activeFilters, setActiveFilters] = useStoredState<string[]>('cookr.filters.v1', ['easy/fast'])
+  const [activeFilters, setActiveFilters] = useStoredState<string[]>('cookr.filters.v1', [])
   const [selectedIds, setSelectedIds] = useStoredState<string[]>('cookr.plan.v1', ['butter-chicken-traybake', 'no-cook-tuna-sushi-bowls'])
   const [favourites, setFavourites] = useStoredState<string[]>('cookr.favourites.v1', ['veggie-pizza-pita'])
   const [interactions, setInteractions] = useStoredState<RecipeInteraction[]>('cookr.interactions.v1', [])
@@ -661,14 +670,39 @@ function App() {
     )
   }, [deferredSearch, ranked])
   const recommendations = useMemo(() => getRankedRecipes(profile, context), [profile, context])
-  const selectedRecipes = useMemo(() => recipes.filter((recipe) => selectedIds.includes(recipe.id)), [selectedIds])
-  const activeRecipe = recipes.find((recipe) => recipe.id === activeRecipeId) ?? recipes[0]
-  const topRecommendation = recommendations[0]
-  const easierFallback = recommendations.find(({ recipe }) => recipe.effortScore <= 1 && recipe.id !== topRecommendation.recipe.id)
+  const selectedRecipes = useMemo(
+    () => recipes.filter((recipe) => selectedIds.includes(recipe.id) && recipeMeetsHardConstraints(recipe, profile)),
+    [selectedIds, profile],
+  )
+  const safeFallbackRecipe = recipes.find((recipe) => recipeMeetsHardConstraints(recipe, profile))
+  const topRecommendation = recommendations[0] ?? (safeFallbackRecipe ? {
+    recipe: safeFallbackRecipe,
+    score: 0,
+    reasons: ['closest safe fallback while the catalogue grows'],
+  } : null)
+  const activeRecipe =
+    recipes.find((recipe) => recipe.id === activeRecipeId && recipeMeetsHardConstraints(recipe, profile)) ??
+    topRecommendation?.recipe ??
+    recipes[0]
+  const easierFallback = topRecommendation
+    ? recommendations.find(({ recipe }) => recipe.effortScore <= 1 && recipe.id !== topRecommendation.recipe.id)
+    : undefined
   const overlapScore = getIngredientOverlapScore(selectedRecipes)
   const cookedMeals = interactions.reduce((sum, interaction) => sum + (interaction.cookedCount ?? 0), 0)
 
   const handleFinishOnboarding = () => {
+    const starterContext = makeRecommendationContext(profile, {
+      mode: profile.energyLevel <= 2 ? 'no_energy' : 'cook_15',
+      energyLevel: profile.energyLevel,
+      interactions,
+    })
+    const starterIds = getRankedRecipes(profile, starterContext)
+      .slice(0, 2)
+      .map(({ recipe }) => recipe.id)
+    setSelectedIds(starterIds)
+    setActiveRecipeId(starterIds[0] ?? recipes[0].id)
+    setActiveFilters([])
+    setMode(starterContext.mode)
     setOnboarded(true)
     trackEvent('onboarding_completed', { confidence: profile.confidence, blockers: profile.blockers.length })
   }
@@ -758,15 +792,34 @@ function App() {
             <section className="hero-band">
               <div>
                 <p className="section-label">Best right now</p>
-                <h1>{mode === 'no_energy' ? 'Feed yourself with almost no effort' : 'Tonight, without the takeaway'}</h1>
-                <p>
-                  Start with <strong>{topRecommendation.recipe.title}</strong>: {topRecommendation.reasons.slice(0, 3).join(', ')}.
-                </p>
+                <h1>
+                  {topRecommendation
+                    ? mode === 'no_energy'
+                      ? 'Feed yourself with almost no effort'
+                      : 'Tonight, without the takeaway'
+                    : 'Your setup needs one more option'}
+                </h1>
+                {topRecommendation ? (
+                  <p>
+                    Start with <strong>{topRecommendation.recipe.title}</strong>: {topRecommendation.reasons.slice(0, 3).join(', ')}.
+                  </p>
+                ) : (
+                  <p>
+                    No recipe matches your dietary needs and available appliances yet. Edit setup or add one
+                    appliance so Cookr can make a realistic plan.
+                  </p>
+                )}
                 <div className="hero-actions">
-                  <button className="primary-action" type="button" onClick={() => handleStartCooking(topRecommendation.recipe.id)}>
-                    {isStarting ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Timer size={18} aria-hidden="true" />}
-                    Start cooking
-                  </button>
+                  {topRecommendation ? (
+                    <button className="primary-action" type="button" onClick={() => handleStartCooking(topRecommendation.recipe.id)}>
+                      {isStarting ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Timer size={18} aria-hidden="true" />}
+                      Start cooking
+                    </button>
+                  ) : (
+                    <button className="primary-action" type="button" onClick={() => setOnboarded(false)}>
+                      Edit setup
+                    </button>
+                  )}
                   <button className="secondary-action" type="button" onClick={() => setView('shopping')}>Build grocery list</button>
                 </div>
               </div>
@@ -781,6 +834,7 @@ function App() {
                   <span>{overlapScore} overlaps</span>
                   <span>${selectedRecipes.reduce((sum, recipe) => sum + recipe.costEstimateNzd, 0).toFixed(0)}/serve week</span>
                 </div>
+                <button className="text-action" type="button" onClick={() => setOnboarded(false)}>Edit setup</button>
               </div>
             </section>
 
@@ -790,7 +844,7 @@ function App() {
                 <div>
                   <p className="section-label">Even easier fallback</p>
                   <h2>{easierFallback.recipe.title}</h2>
-                  <p>{easierFallback.reasons.join(' · ')}</p>
+                  <p>{easierFallback.reasons.join(' - ')}</p>
                 </div>
                 <button type="button" className="secondary-action" onClick={() => handleStartCooking(easierFallback.recipe.id)}>
                   Use this
@@ -852,11 +906,14 @@ function App() {
               />
             )}
 
-            <RecipeDetail
-              recipe={activeRecipe}
-              onCook={() => handleStartCooking(activeRecipe.id)}
-              onAdd={() => togglePlanRecipe(activeRecipe.id)}
-            />
+            {topRecommendation ? (
+              <RecipeDetail
+                recipe={activeRecipe}
+                onCook={() => handleStartCooking(activeRecipe.id)}
+                onAdd={() => togglePlanRecipe(activeRecipe.id)}
+                isInPlan={selectedIds.includes(activeRecipe.id)}
+              />
+            ) : null}
 
             <section className="insights-grid">
               <div className="panel">
@@ -879,7 +936,15 @@ function App() {
         )}
 
         {view === 'shopping' && <ShoppingList selectedRecipes={selectedRecipes} profile={profile} onFindRecipes={() => setView('home')} />}
-        {view === 'cook' && <CookingMode key={activeRecipe.id} recipe={activeRecipe} onComplete={handleCooked} onTooHard={handleTooHard} />}
+        {view === 'cook' && (topRecommendation ? (
+          <CookingMode key={activeRecipe.id} recipe={activeRecipe} onComplete={handleCooked} onTooHard={handleTooHard} />
+        ) : (
+          <EmptyState
+            title="No cookable recipe yet"
+            body="Your current diet and appliance setup has no safe match in the starter catalogue. Edit setup, then Cookr will rebuild the plan."
+            action={{ label: 'Edit setup', onClick: () => setOnboarded(false) }}
+          />
+        ))}
         {view === 'learn' && (
           <section className="panel learn-panel">
             <p className="section-label">Confidence lessons</p>

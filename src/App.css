@@ -453,12 +453,19 @@ p {
 }
 
 .recipe-card button,
-.step-actions button {
+.step-actions button,
+.text-action {
   min-height: 38px;
   padding: 0 12px;
   background: var(--soft);
   color: var(--text-h);
   font-weight: 800;
+}
+
+.text-action {
+  width: fit-content;
+  border: 0;
+  border-radius: 7px;
 }
 
 .detail-panel {
@@ -1052,6 +1059,12 @@ input[type='checkbox'] {
 
   .search-box input {
     min-width: 0;
+  }
+
+  .sticky-submit {
+    position: static;
+    padding-top: 0;
+    background: transparent;
   }
 }
 

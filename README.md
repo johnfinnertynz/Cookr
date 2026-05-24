@@ -57,6 +57,7 @@ npm run qa:smoke
 - `docs/ARCHITECTURE.md`: technical architecture.
 - `docs/PRODUCTION_ARCHITECTURE.md`: scalable startup architecture, APIs, recommendation engine, ingestion, caching, security, and roadmap.
 - `docs/PRODUCTION_READINESS_AUDIT.md`: production-readiness findings, fixes, residual risk, and launch scores.
+- `docs/BETA_TEST_REPORT.md`: real-user beta simulation report, fixes, blockers, and next improvements.
 - `docs/APP_STORE_READINESS.md`: app store metadata, screenshots plan, privacy/terms draft, and beta checklist.
 - `docs/schema.sql`: Supabase-ready schema.
 - `docs/schema.production.sql`: production-oriented normalized Supabase/Postgres schema.
