@@ -1,5 +1,5 @@
-const CACHE_NAME = 'cookr-shell-v1'
-const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/favicon.svg']
+const CACHE_NAME = 'cookr-shell-v2'
+const SHELL_ASSETS = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons.svg']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)))
@@ -18,9 +18,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
 
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request).catch(() => caches.match('/')))
+    return
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
+        if (!response || response.status >= 500) return response
         const copy = response.clone()
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
         return response

@@ -122,3 +122,17 @@ export type AnalyticsEvent = {
   occurredAt: string
   properties?: Record<string, string | number | boolean | null>
 }
+
+export type RecipeFeedback = {
+  recipeId: string
+  outcome: 'would_repeat' | 'too_hard' | 'too_expensive' | 'not_filling' | 'shopping_issue'
+  occurredAt: string
+}
+
+export type AccountState = {
+  email: string
+  syncEnabled: boolean
+  lastSyncAt?: string
+  status: 'local' | 'ready' | 'synced' | 'error'
+  message?: string
+}

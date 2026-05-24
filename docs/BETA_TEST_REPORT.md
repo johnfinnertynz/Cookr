@@ -84,3 +84,56 @@ This is now credible for a small internal/TestFlight-style beta with clear discl
 8. Add store-aware product confidence and cached price snapshots from permitted data sources only.
 9. Add real PWA install prompts, icons, offline recipe caches, and mobile safe-area QA.
 10. Add beta feedback capture after cooking and after abandoning a recipe.
+
+## Growth Pass Repeat
+
+Date: 2026-05-24
+
+After the beta pass, the top 10 improvements were implemented in MVP form and the real-user simulation was repeated.
+
+### Improvements Added
+
+- Catalogue expanded to 112 Cookr-original recipes using reusable growth templates and no scraped copyrighted instructions.
+- Weekly planner added with tonight, repeat, rescue, batch, and ingredient-overlap slots.
+- Starter pantry bundle added with Woolworths NZ search links for high-leverage staples.
+- Recipe detail now suggests easier, cheaper, higher-protein, vegetarian, and no-chop swaps.
+- Dietary/allergen caution copy added to onboarding, recipe detail, learn, and pantry surfaces.
+- Supabase magic-link bridge added behind `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, with local-only fallback.
+- On-device analytics dashboard added for onboarding, saves, cooks, lists, product clicks, and feedback.
+- Shopping list now shows price-confidence summaries across high/medium/low product matches.
+- PWA manifest and service worker improved with shortcuts, app install surface, offline navigation fallback, and shell caching.
+- Post-cook and abandonment feedback capture added.
+
+### Repeated Persona Results
+
+| Persona | Top recommendation after growth pass | Weekly plan | Remaining friction |
+| --- | --- | --- | --- |
+| Complete beginner | Garlic Herb Microwave Egg Mug Rice | 4 slots | More non-egg microwave meals would help. |
+| Gym/high-protein | Beginner Butter Chicken Tray Bake | 4 slots | Needs macro-verified nutrition later. |
+| Student tight budget | Student Peanut Noodles | 4 slots | Cheap variety improved, but prices remain estimates. |
+| Tired worker | Garlic Herb Microwave Egg Mug Rice | 4 slots | Strong low-energy path now. |
+| Parent/family | Family Sausage & Potato Tray Bake | 4 slots | Needs more kid-specific picky filters. |
+| Picky no fish | Student Peanut Noodles | 3 slots | Fish/tuna avoidance held. |
+| Vegetarian | Student Peanut Noodles | 3 slots | More balanced vegetarian protein still needed. |
+| Air fryer only | No-Cook Hummus Salad Wraps | 4 slots | No-cook is viable, but air-fryer-first ranking can improve. |
+| Trying to stop Uber Eats | Student Peanut Noodles | 3 slots | Fakeaway variety improved. |
+| Random pantry | Student Peanut Noodles | 4 slots | Pantry scoring works. |
+| Shift worker late | Garlic Herb Microwave Egg Mug Rice | 4 slots | Late-night path is much safer. |
+| ADHD low dishes | Garlic Herb Microwave Egg Mug Rice | 4 slots | One-step mode remains key. |
+| Depressed low energy | Garlic Herb Microwave Egg Mug Rice | 4 slots | Copy should be tested with real users for tone. |
+| Student vegetarian | Student Peanut Noodles | 4 slots | Good budget fit. |
+| Parent picky kids | Family Sausage & Potato Tray Bake | 3 slots | Spice/fish avoidance held. |
+| Microwave-only | Garlic Herb Microwave Egg Mug Rice | 4 slots | Previously weak, now covered. |
+| Stovetop-only | Student Peanut Noodles | 4 slots | Strong coverage. |
+| Vegan | Chickpea Coconut Curry in a Hurry | 3 slots | Vegan coverage improved but still narrower. |
+| Halal-aware | Student Peanut Noodles | 3 slots | Halal remains non-certified and must be labelled carefully. |
+| No pantry | Garlic Herb Microwave Egg Mug Rice | 4 slots | Starter pantry bundle now gives a next step. |
+| Gluten-free beginner | Garlic Herb Microwave Egg Mug Rice | 4 slots | Gluten-risk filtering works, but not certified. |
+| Dairy-free air fryer | No-Cook Tuna Sushi Bowls | 4 slots | Dairy-risk filtering works, but not certified. |
+| Vegan microwave-only edge | Garlic Herb Microwave Bean Potato Bowl | 4 slots | Previously no-match, now covered. |
+
+Simulation result: 23/23 personas returned at least one hard-constraint-safe recommendation and a weekly plan.
+
+Updated beta launch readiness: 74/100
+
+Remaining blockers are now less about MVP UX and more about production trust: real user accounts, real data governance, pricing freshness, nutrition verification, and human-tested recipe quality.

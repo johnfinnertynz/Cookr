@@ -49,6 +49,10 @@ const getRequiredAppliances = (recipe: Recipe) => {
 export const recipeMeetsHardConstraints = (recipe: Recipe, profile: UserProfile) => {
   if (profile.dietaries.includes('vegetarian') && !recipe.tags.includes('vegetarian')) return false
   if (profile.dietaries.includes('vegan') && !recipe.tags.includes('vegan')) return false
+  const ingredientText = recipe.ingredients.map((ingredient) => `${ingredient.name} ${ingredient.canonicalName ?? ''}`).join(' ').toLowerCase()
+  if (profile.dietaries.includes('gluten-free') && /(pasta|wrap|pita|bread|noodles|flour|oats)/.test(ingredientText)) return false
+  if (profile.dietaries.includes('dairy-free') && /(yoghurt|mozzarella|sour cream|cheese|butter)/.test(ingredientText)) return false
+  if (profile.dietaries.includes('halal') && /(pork|bacon|ham|sausage|sausages)/.test(ingredientText)) return false
   const requiredAppliances = getRequiredAppliances(recipe)
   if (
     profile.appliances.length > 0 &&

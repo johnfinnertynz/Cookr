@@ -4,6 +4,7 @@
   "description": "Low-effort guided cooking for New Zealanders replacing takeaways.",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#f7faf7",
   "theme_color": "#238b5a",
   "orientation": "portrait-primary",
@@ -13,6 +14,34 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tonight mode",
+      "short_name": "Tonight",
+      "description": "Open Cookr and pick a low-effort dinner.",
+      "url": "/?mode=tonight",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Shopping list",
+      "short_name": "List",
+      "description": "Open your current grocery list.",
+      "url": "/?view=shopping",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ],
   "categories": ["food", "lifestyle", "health"]

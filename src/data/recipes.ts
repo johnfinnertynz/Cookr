@@ -1,6 +1,7 @@
 import type { Recipe } from '../types'
+import { growthRecipes } from './recipeGrowth'
 
-export const recipes: Recipe[] = [
+const coreRecipes: Recipe[] = [
   {
     id: 'butter-chicken-traybake',
     title: 'Beginner Butter Chicken Tray Bake',
@@ -406,3 +407,5 @@ export const recipes: Recipe[] = [
     nutrition: { calories: 610, protein: 25, fibre: 7 },
   },
 ]
+
+export const recipes: Recipe[] = [...coreRecipes, ...growthRecipes]

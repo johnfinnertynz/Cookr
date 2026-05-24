@@ -265,7 +265,12 @@ p {
 
 .quick-plan svg,
 .insights-grid svg,
-.learn-panel svg {
+.learn-panel svg,
+.feedback-strip svg,
+.install-card svg,
+.account-panel svg,
+.analytics-panel svg,
+.pantry-panel > svg {
   color: var(--green);
 }
 
@@ -454,7 +459,9 @@ p {
 
 .recipe-card button,
 .step-actions button,
-.text-action {
+.text-action,
+.inline-actions button,
+.feedback-actions button {
   min-height: 38px;
   padding: 0 12px;
   background: var(--soft);
@@ -488,7 +495,13 @@ p {
 
 .beginner-callout,
 .fallback-strip,
-.visual-cue {
+.visual-cue,
+.safety-note,
+.feedback-strip,
+.price-confidence,
+.install-card,
+.account-panel,
+.analytics-panel {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -498,20 +511,73 @@ p {
   color: var(--text-h);
 }
 
+.safety-note {
+  background: var(--soft);
+}
+
+.safety-note p,
+.feedback-strip p,
+.install-card p,
+.account-panel p,
+.pantry-panel p {
+  color: var(--muted);
+}
+
 .fallback-strip {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
 }
 
-.fallback-strip p {
-  color: var(--muted);
-}
-
 .detail-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.variant-panel {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.variant-grid button,
+.week-card,
+.pantry-list a,
+.show-more-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-h);
+  text-align: left;
+  text-decoration: none;
+}
+
+.variant-grid span,
+.week-card span {
+  color: var(--green-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.variant-grid small,
+.week-card small,
+.pantry-list span,
+.install-card small,
+.account-panel small,
+.price-confidence small,
+.price-confidence span {
+  color: var(--muted);
 }
 
 .detail-stats {
@@ -563,10 +629,100 @@ p {
 .insights-grid,
 .help-grid,
 .lesson-list,
-.substitution-grid {
+.substitution-grid,
+.growth-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.planner-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.planner-main,
+.pantry-panel,
+.install-card,
+.account-panel,
+.analytics-panel {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.week-card h2 {
+  font-size: 1.25rem;
+}
+
+.inline-actions,
+.feedback-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedback-strip {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.feedback-actions {
+  justify-content: flex-end;
+}
+
+.pantry-list {
+  display: grid;
+  gap: 8px;
+}
+
+.install-card,
+.account-panel,
+.analytics-panel {
+  align-content: start;
+  margin-top: 18px;
+}
+
+.account-panel label {
+  display: grid;
+  gap: 7px;
+  font-weight: 800;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metric-grid span {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.metric-grid strong {
+  color: var(--text-h);
+  font-size: 1.35rem;
+}
+
+.show-more-card {
+  min-height: 180px;
+  place-content: center;
+  text-align: center;
+  font-weight: 900;
 }
 
 .insights-grid .panel,
@@ -623,6 +779,17 @@ p {
 
 .grocery-row.checked {
   opacity: 0.62;
+}
+
+.price-confidence {
+  align-items: center;
+  justify-content: space-between;
+  background: var(--soft);
+}
+
+.price-confidence div {
+  display: grid;
+  gap: 2px;
 }
 
 .cooking-mode {
@@ -922,10 +1089,13 @@ input[type='checkbox'] {
   .hero-band,
   .recipe-grid,
   .detail-panel,
+  .planner-layout,
+  .week-grid,
   .onboarding,
   .help-grid,
   .lesson-list,
   .substitution-grid,
+  .growth-grid,
   .mode-grid {
     grid-template-columns: 1fr;
   }
@@ -976,7 +1146,7 @@ input[type='checkbox'] {
     bottom: max(12px, env(safe-area-inset-bottom));
     z-index: 12;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 4px;
     padding: 6px;
     background: color-mix(in srgb, var(--bg) 92%, transparent);
@@ -1043,7 +1213,10 @@ input[type='checkbox'] {
   }
 
   .hero-actions,
-  .detail-actions {
+  .detail-actions,
+  .feedback-actions,
+  .inline-actions,
+  .variant-grid {
     display: grid;
     grid-template-columns: 1fr;
   }

@@ -2,19 +2,25 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   BadgeCheck,
+  BarChart3,
   BatteryLow,
   BookOpen,
   CalendarDays,
   ChefHat,
   ChevronRight,
   Clock3,
+  Cloud,
   Dumbbell,
   Flame,
   Heart,
   Loader2,
+  MessageSquare,
   Moon,
+  PackageCheck,
+  Plus,
   RotateCcw,
   Search,
+  ShieldCheck,
   ShoppingBasket,
   Sparkles,
   Timer,
@@ -33,9 +39,14 @@ import {
   makeRecommendationContext,
   recipeMeetsHardConstraints,
 } from './lib/recommendations'
-import { trackEvent } from './lib/analytics'
+import { buildWeeklyPlan, getStarterPantryBundle, type StarterPantryItem, type WeeklyPlanSlot } from './lib/planner'
+import { getRecipeVariants, type RecipeVariant } from './lib/recipeVariants'
+import { getBasketPriceConfidence } from './lib/priceGuide'
+import { defaultAccountState, markLocalSyncSnapshot, requestMagicLink } from './lib/account'
+import { useInstallPrompt } from './lib/pwa'
+import { getAnalyticsEvents, getAnalyticsSummary, trackEvent } from './lib/analytics'
 import { useOnlineStatus, useStoredState } from './lib/storage'
-import type { Recipe, RecipeInteraction, TonightMode, UserProfile } from './types'
+import type { AccountState, Recipe, RecipeFeedback, RecipeInteraction, TonightMode, UserProfile } from './types'
 
 const filters = [
   'easy/fast',
@@ -269,6 +280,7 @@ function Onboarding({
             ))}
           </div>
         </fieldset>
+        <SafetyNote />
 
         <fieldset>
           <legend>Appliances available</legend>
@@ -433,16 +445,90 @@ function EmptyState({
   )
 }
 
+function SafetyNote() {
+  return (
+    <div className="safety-note">
+      <ShieldCheck size={17} aria-hidden="true" />
+      <p>
+        Dietary tags and prices are guidance only. Check product labels, allergens, religious suitability,
+        and current Woolworths prices before buying or cooking.
+      </p>
+    </div>
+  )
+}
+
+function FeedbackStrip({
+  recipe,
+  onFeedback,
+}: {
+  recipe?: Recipe
+  onFeedback: (outcome: RecipeFeedback['outcome']) => void
+}) {
+  if (!recipe) return null
+
+  return (
+    <section className="feedback-strip panel" aria-labelledby="feedback-title">
+      <MessageSquare aria-hidden="true" />
+      <div>
+        <p className="section-label">Beta feedback</p>
+        <h2 id="feedback-title">How did {recipe.title} go?</h2>
+        <p>One tap improves your next recommendations.</p>
+      </div>
+      <div className="feedback-actions">
+        {[
+          ['would_repeat', 'Cook again'],
+          ['too_hard', 'Too hard'],
+          ['too_expensive', 'Too pricey'],
+          ['shopping_issue', 'Shop issue'],
+        ].map(([outcome, label]) => (
+          <button key={outcome} type="button" onClick={() => onFeedback(outcome as RecipeFeedback['outcome'])}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function RecipeVariants({
+  variants,
+  onOpen,
+}: {
+  variants: RecipeVariant[]
+  onOpen: (recipeId: string) => void
+}) {
+  if (!variants.length) return null
+
+  return (
+    <div className="variant-panel">
+      <h3>Swap without restarting</h3>
+      <div className="variant-grid">
+        {variants.map((variant) => (
+          <button type="button" key={`${variant.label}-${variant.recipe.id}`} onClick={() => onOpen(variant.recipe.id)}>
+            <span>{variant.label}</span>
+            <strong>{variant.recipe.title}</strong>
+            <small>{variant.reason}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function RecipeDetail({
   recipe,
   onCook,
   onAdd,
   isInPlan,
+  variants,
+  onVariantOpen,
 }: {
   recipe: Recipe
   onCook: () => void
   onAdd: () => void
   isInPlan: boolean
+  variants: RecipeVariant[]
+  onVariantOpen: (recipeId: string) => void
 }) {
   return (
     <section className="detail-panel panel" aria-labelledby="recipe-title">
@@ -462,6 +548,7 @@ function RecipeDetail({
           <BadgeCheck aria-hidden="true" />
           <p>{recipe.skillTips[0]}</p>
         </div>
+        <SafetyNote />
         <h3>Ingredients</h3>
         <ul className="ingredient-list">
           {recipe.ingredients.map((ingredient) => (
@@ -477,6 +564,7 @@ function RecipeDetail({
             Start cooking <Timer size={18} aria-hidden="true" />
           </button>
         </div>
+        <RecipeVariants variants={variants} onOpen={onVariantOpen} />
       </div>
     </section>
   )
@@ -577,6 +665,7 @@ function ShoppingList({
   const baseLines = useMemo(() => buildGroceryList(selectedRecipes, profile.pantryItems), [selectedRecipes, profile.pantryItems])
   const lines = baseLines.map((line) => ({ ...line, checked: checked[line.name] ?? line.checked }))
   const total = estimateBasketTotal(lines)
+  const confidence = getBasketPriceConfidence(lines)
   const groupedLines = lines.reduce<Record<string, typeof lines>>((groups, line) => {
     groups[line.category] = groups[line.category] ? [...groups[line.category], line] : [line]
     return groups
@@ -609,6 +698,14 @@ function ShoppingList({
         Links open user-controlled Woolworths NZ searches. Prices are estimates; Cookr does not scrape result
         pages or automate checkout.
       </p>
+      <div className="price-confidence">
+        <PackageCheck aria-hidden="true" />
+        <div>
+          <strong>{confidence.label}</strong>
+          <span>{confidence.copy}</span>
+        </div>
+        <small>{confidence.high} high / {confidence.medium} medium / {confidence.low} low</small>
+      </div>
       <div className="grocery-list">
         {Object.entries(groupedLines).map(([category, categoryLines]) => (
           <section className="aisle-group" key={category} aria-label={category}>
@@ -639,6 +736,175 @@ function ShoppingList({
   )
 }
 
+function InstallPromptCard() {
+  const { canInstall, installed, promptInstall } = useInstallPrompt()
+
+  return (
+    <section className="panel install-card">
+      <PackageCheck aria-hidden="true" />
+      <div>
+        <p className="section-label">PWA readiness</p>
+        <h2>{installed ? 'Installed on this device' : 'Keep Cookr one tap away'}</h2>
+        <p>
+          Offline recipe steps, saved plans, and grocery lists are cached locally. Install support depends
+          on the browser and platform.
+        </p>
+      </div>
+      <button
+        className="secondary-action"
+        type="button"
+        disabled={!canInstall || installed}
+        onClick={() => {
+          void promptInstall().then((outcome) => trackEvent('pwa_install_prompt_completed', { outcome }))
+        }}
+      >
+        {installed ? 'Installed' : canInstall ? 'Install app' : 'Install from browser'}
+      </button>
+    </section>
+  )
+}
+
+function AccountPanel({
+  account,
+  setAccount,
+}: {
+  account: AccountState
+  setAccount: (account: AccountState) => void
+}) {
+  const [email, setEmail] = useState(account.email)
+  const [loading, setLoading] = useState(false)
+
+  const handleSyncRequest = async () => {
+    setLoading(true)
+    const nextAccount = await requestMagicLink(email.trim())
+    setAccount(nextAccount)
+    setLoading(false)
+  }
+
+  return (
+    <section className="panel account-panel" aria-labelledby="account-title">
+      <Cloud aria-hidden="true" />
+      <div>
+        <p className="section-label">Account and sync</p>
+        <h2 id="account-title">Local-first now, Supabase-ready next</h2>
+        <p>{account.message}</p>
+      </div>
+      <label>
+        Email for beta sync
+        <input value={email} placeholder="you@example.co.nz" inputMode="email" onChange={(event) => setEmail(event.target.value)} />
+      </label>
+      <div className="inline-actions">
+        <button className="secondary-action" type="button" disabled={!email.trim() || loading} onClick={() => void handleSyncRequest()}>
+          {loading ? 'Checking...' : 'Send magic link'}
+        </button>
+        <button
+          className="secondary-action"
+          type="button"
+          onClick={() => {
+            setAccount(markLocalSyncSnapshot(account))
+            trackEvent('local_sync_snapshot_marked', { enabled: account.syncEnabled })
+          }}
+        >
+          Mark snapshot
+        </button>
+      </div>
+      <small>Status: {account.status}{account.lastSyncAt ? ` - ${new Date(account.lastSyncAt).toLocaleDateString()}` : ''}</small>
+    </section>
+  )
+}
+
+function AnalyticsDashboard({ feedbackCount }: { feedbackCount: number }) {
+  const summary = getAnalyticsSummary(getAnalyticsEvents())
+
+  return (
+    <section className="panel analytics-panel" aria-labelledby="analytics-title">
+      <BarChart3 aria-hidden="true" />
+      <div>
+        <p className="section-label">Beta analytics</p>
+        <h2 id="analytics-title">Drop-off signals on this device</h2>
+      </div>
+      <div className="metric-grid">
+        <span><strong>{summary.onboardingCompleted}</strong> onboarded</span>
+        <span><strong>{summary.recipesSaved}</strong> saves</span>
+        <span><strong>{summary.recipesCooked}</strong> cooks</span>
+        <span><strong>{summary.listsCreated}</strong> lists</span>
+        <span><strong>{summary.productClicks}</strong> product clicks</span>
+        <span><strong>{feedbackCount}</strong> feedback</span>
+      </div>
+      <p className="source-note">
+        MVP analytics stay on-device. Production should forward consented events to Supabase or a privacy-aware analytics service.
+      </p>
+    </section>
+  )
+}
+
+function WeeklyPlanner({
+  weeklyPlan,
+  pantryBundle,
+  selectedIds,
+  onAddRecipe,
+  onAddWeek,
+  onCook,
+  onOpen,
+}: {
+  weeklyPlan: WeeklyPlanSlot[]
+  pantryBundle: StarterPantryItem[]
+  selectedIds: string[]
+  onAddRecipe: (recipeId: string) => void
+  onAddWeek: () => void
+  onCook: (recipeId: string) => void
+  onOpen: (recipeId: string) => void
+}) {
+  return (
+    <section className="planner-layout" aria-labelledby="planner-title">
+      <div className="panel planner-main">
+        <div className="section-heading">
+          <div>
+            <p className="section-label">Weekly rotation</p>
+            <h1 id="planner-title">A week that reuses ingredients</h1>
+          </div>
+          <button className="primary-action" type="button" onClick={onAddWeek}>
+            <Plus size={17} aria-hidden="true" /> Add week
+          </button>
+        </div>
+        <div className="week-grid">
+          {weeklyPlan.map((slot) => (
+            <article className="week-card" key={slot.id}>
+              <span>{slot.label}</span>
+              <h2>{slot.recipe.title}</h2>
+              <p>{slot.reason}</p>
+              <small>{slot.recipe.timeMinutes} min - ${slot.recipe.costEstimateNzd.toFixed(2)}/serve - {slot.recipe.proteinEstimateGrams}g protein</small>
+              <div className="inline-actions">
+                <button type="button" onClick={() => onAddRecipe(slot.recipe.id)}>
+                  {selectedIds.includes(slot.recipe.id) ? 'Remove' : 'Add'}
+                </button>
+                <button type="button" onClick={() => onOpen(slot.recipe.id)}>View</button>
+                <button type="button" onClick={() => onCook(slot.recipe.id)}>Cook</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel pantry-panel">
+        <ShoppingBasket aria-hidden="true" />
+        <p className="section-label">Starter pantry</p>
+        <h2>First shop bundle</h2>
+        <p>For users starting with almost nothing, these unlock the most Cookr meals for the least decision load.</p>
+        <div className="pantry-list">
+          {pantryBundle.map((item) => (
+            <a key={item.key} href={item.match.searchUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent('starter_pantry_link_opened', { item: item.key })}>
+              <strong>{item.name}</strong>
+              <span>{item.why}</span>
+            </a>
+          ))}
+        </div>
+        <SafetyNote />
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const online = useOnlineStatus()
   const [profile, setProfile] = useStoredState<UserProfile>('cookr.profile.v2', defaultProfile)
@@ -647,11 +913,15 @@ function App() {
   const [selectedIds, setSelectedIds] = useStoredState<string[]>('cookr.plan.v1', ['butter-chicken-traybake', 'no-cook-tuna-sushi-bowls'])
   const [favourites, setFavourites] = useStoredState<string[]>('cookr.favourites.v1', ['veggie-pizza-pita'])
   const [interactions, setInteractions] = useStoredState<RecipeInteraction[]>('cookr.interactions.v1', [])
+  const [feedback, setFeedback] = useStoredState<RecipeFeedback[]>('cookr.feedback.v1', [])
+  const [account, setAccount] = useStoredState<AccountState>('cookr.account.v1', defaultAccountState)
+  const [recentCookedRecipeId, setRecentCookedRecipeId] = useStoredState<string | null>('cookr.recentCookedRecipe.v1', null)
   const [activeRecipeId, setActiveRecipeId] = useStoredState('cookr.activeRecipe.v1', recipes[0].id)
-  const [view, setView] = useStoredState<'home' | 'shopping' | 'cook' | 'learn'>('cookr.view.v1', 'home')
+  const [view, setView] = useStoredState<'home' | 'plan' | 'shopping' | 'cook' | 'learn'>('cookr.view.v1', 'home')
   const [mode, setMode] = useStoredState<TonightMode>('cookr.mode.v1', 'cook_15')
   const [searchTerm, setSearchTerm] = useState('')
   const [isStarting, setIsStarting] = useState(false)
+  const [visibleRecipeCount, setVisibleRecipeCount] = useState(24)
   const deferredSearch = useDeferredValue(searchTerm)
 
   const context = useMemo(
@@ -687,6 +957,11 @@ function App() {
   const easierFallback = topRecommendation
     ? recommendations.find(({ recipe }) => recipe.effortScore <= 1 && recipe.id !== topRecommendation.recipe.id)
     : undefined
+  const weeklyPlan = useMemo(() => buildWeeklyPlan(recommendations, profile, interactions), [recommendations, profile, interactions])
+  const pantryBundle = useMemo(() => getStarterPantryBundle(profile), [profile])
+  const activeRecipeVariants = useMemo(() => getRecipeVariants(activeRecipe, profile), [activeRecipe, profile])
+  const recentCookedRecipe = recentCookedRecipeId ? recipes.find((recipe) => recipe.id === recentCookedRecipeId) : undefined
+  const visibleSearchedRecipes = searchedRecipes.slice(0, visibleRecipeCount)
   const overlapScore = getIngredientOverlapScore(selectedRecipes)
   const cookedMeals = interactions.reduce((sum, interaction) => sum + (interaction.cookedCount ?? 0), 0)
 
@@ -717,6 +992,21 @@ function App() {
     trackEvent(selectedIds.includes(recipeId) ? 'recipe_removed_from_plan' : 'recipe_added_to_plan', { recipeId })
   }
 
+  const addWeeklyPlan = () => {
+    const weekIds = weeklyPlan.map((slot) => slot.recipe.id)
+    setSelectedIds(Array.from(new Set([...selectedIds, ...weekIds])))
+    setView('shopping')
+    trackEvent('weekly_plan_added', { recipeCount: weekIds.length })
+  }
+
+  const addRecipeFeedback = (recipeId: string, outcome: RecipeFeedback['outcome']) => {
+    setFeedback([...feedback.slice(-99), { recipeId, outcome, occurredAt: new Date().toISOString() }])
+    if (outcome === 'would_repeat') {
+      setInteractions(updateInteraction(interactions, recipeId, { wouldRepeat: true }))
+    }
+    trackEvent('recipe_feedback_added', { recipeId, outcome })
+  }
+
   const handleStartCooking = (recipeId = activeRecipe.id) => {
     setIsStarting(true)
     setActiveRecipeId(recipeId)
@@ -734,6 +1024,7 @@ function App() {
       lastCookedAt: new Date().toISOString(),
       wouldRepeat: true,
     }))
+    setRecentCookedRecipeId(activeRecipe.id)
     trackEvent('cooking_completed', { recipeId: activeRecipe.id })
     setView('home')
   }
@@ -743,6 +1034,7 @@ function App() {
     setInteractions(updateInteraction(interactions, activeRecipe.id, {
       tooHardCount: (current?.tooHardCount ?? 0) + 1,
     }))
+    addRecipeFeedback(activeRecipe.id, 'too_hard')
     trackEvent('recipe_marked_too_hard', { recipeId: activeRecipe.id })
     if (easierFallback) {
       setActiveRecipeId(easierFallback.recipe.id)
@@ -764,6 +1056,7 @@ function App() {
         <nav aria-label="Primary">
           {[
             ['home', 'Home'],
+            ['plan', 'Plan'],
             ['shopping', 'List'],
             ['cook', 'Cook'],
             ['learn', 'Learn'],
@@ -785,6 +1078,7 @@ function App() {
               mode={mode}
               onModeChange={(nextMode) => {
                 setMode(nextMode)
+                setVisibleRecipeCount(24)
                 trackEvent('tonight_mode_selected', { mode: nextMode })
               }}
             />
@@ -838,6 +1132,11 @@ function App() {
               </div>
             </section>
 
+            <FeedbackStrip
+              recipe={recentCookedRecipe}
+              onFeedback={(outcome) => recentCookedRecipe ? addRecipeFeedback(recentCookedRecipe.id, outcome) : undefined}
+            />
+
             {easierFallback ? (
               <section className="fallback-strip panel">
                 <BatteryLow aria-hidden="true" />
@@ -860,7 +1159,14 @@ function App() {
                 </div>
                 <label className="search-box">
                   <Search size={16} aria-hidden="true" />
-                  <input value={searchTerm} placeholder="Search meals or ingredients" onChange={(event) => setSearchTerm(event.target.value)} />
+                  <input
+                    value={searchTerm}
+                    placeholder="Search meals or ingredients"
+                    onChange={(event) => {
+                      setSearchTerm(event.target.value)
+                      setVisibleRecipeCount(24)
+                    }}
+                  />
                 </label>
               </div>
               <div className="filter-drawer">
@@ -870,7 +1176,10 @@ function App() {
                     className={activeFilters.includes(filter) ? 'chip active' : 'chip'}
                     key={filter}
                     type="button"
-                    onClick={() => setActiveFilters(toggleItem(activeFilters, filter))}
+                    onClick={() => {
+                      setActiveFilters(toggleItem(activeFilters, filter))
+                      setVisibleRecipeCount(24)
+                    }}
                   >
                     {filter}
                   </button>
@@ -880,7 +1189,7 @@ function App() {
 
             {searchedRecipes.length ? (
               <section className="recipe-grid" aria-label="Recipe results">
-                {searchedRecipes.map(({ recipe, score, reasons }) => (
+                {visibleSearchedRecipes.map(({ recipe, score, reasons }) => (
                   <RecipeCard
                     key={recipe.id}
                     recipe={recipe}
@@ -897,6 +1206,12 @@ function App() {
                     }}
                   />
                 ))}
+                {visibleRecipeCount < searchedRecipes.length ? (
+                  <button className="show-more-card" type="button" onClick={() => setVisibleRecipeCount((value) => value + 24)}>
+                    Show 24 more recipes
+                    <small>{searchedRecipes.length - visibleRecipeCount} still hidden for speed</small>
+                  </button>
+                ) : null}
               </section>
             ) : (
               <EmptyState
@@ -912,6 +1227,8 @@ function App() {
                 onCook={() => handleStartCooking(activeRecipe.id)}
                 onAdd={() => togglePlanRecipe(activeRecipe.id)}
                 isInPlan={selectedIds.includes(activeRecipe.id)}
+                variants={activeRecipeVariants}
+                onVariantOpen={openRecipe}
               />
             ) : null}
 
@@ -935,6 +1252,25 @@ function App() {
           </>
         )}
 
+        {view === 'plan' && (
+          <>
+            <WeeklyPlanner
+              weeklyPlan={weeklyPlan}
+              pantryBundle={pantryBundle}
+              selectedIds={selectedIds}
+              onAddRecipe={togglePlanRecipe}
+              onAddWeek={addWeeklyPlan}
+              onCook={handleStartCooking}
+              onOpen={openRecipe}
+            />
+            <section className="growth-grid">
+              <InstallPromptCard />
+              <AccountPanel account={account} setAccount={setAccount} />
+              <AnalyticsDashboard feedbackCount={feedback.length} />
+            </section>
+          </>
+        )}
+
         {view === 'shopping' && <ShoppingList selectedRecipes={selectedRecipes} profile={profile} onFindRecipes={() => setView('home')} />}
         {view === 'cook' && (topRecommendation ? (
           <CookingMode key={activeRecipe.id} recipe={activeRecipe} onComplete={handleCooked} onTooHard={handleTooHard} />
@@ -949,6 +1285,7 @@ function App() {
           <section className="panel learn-panel">
             <p className="section-label">Confidence lessons</p>
             <h1>Small skills that make cooking feel calmer</h1>
+            <SafetyNote />
             <div className="lesson-list">
               <article><BookOpen aria-hidden="true" /><h2>Knife-free starts</h2><p>Use frozen veg, slaw kits, grated cheese, and jar garlic until chopping feels less annoying.</p></article>
               <article><Timer aria-hidden="true" /><h2>Timer habit</h2><p>Set a timer before you walk away. It is the cheapest kitchen confidence upgrade.</p></article>
@@ -966,6 +1303,7 @@ function App() {
 
       <footer className="bottom-nav" aria-label="Mobile navigation">
         <button className={view === 'home' ? 'active-nav' : ''} type="button" onClick={() => setView('home')}><ChefHat aria-hidden="true" /> Home</button>
+        <button className={view === 'plan' ? 'active-nav' : ''} type="button" onClick={() => setView('plan')}><CalendarDays aria-hidden="true" /> Plan</button>
         <button className={view === 'shopping' ? 'active-nav' : ''} type="button" onClick={() => setView('shopping')}><ShoppingBasket aria-hidden="true" /> List</button>
         <button className={view === 'cook' ? 'active-nav' : ''} type="button" onClick={() => setView('cook')}><Timer aria-hidden="true" /> Cook</button>
       </footer>

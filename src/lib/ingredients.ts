@@ -16,6 +16,22 @@ const aliasMap: Record<string, string> = {
   'mild curry powder': 'curry powder',
   'beef sausages': 'sausages',
   'baby potatoes': 'potatoes',
+  'microwave potatoes': 'potatoes',
+  'canned kidney beans': 'kidney beans',
+  'firm tofu': 'tofu',
+  'dried pasta': 'pasta',
+  'frozen peas': 'peas',
+  'chicken tenderloins': 'chicken breast',
+  'chicken drumsticks': 'chicken drumsticks',
+  'red lentils': 'red lentils',
+  'frozen corn': 'corn',
+  'rolled oats': 'rolled oats',
+  'frozen berries': 'berries',
+  'frozen falafel': 'falafel',
+  'sandwich bread': 'bread',
+  'mild taco seasoning': 'taco seasoning',
+  'tomato pasta sauce': 'tomato pasta sauce',
+  'teriyaki sauce': 'teriyaki sauce',
 }
 
 const unitMap: Record<string, { unit: string; factor: number }> = {
