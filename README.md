@@ -2,6 +2,16 @@
 
 Cookr is an MVP cooking assistant for New Zealand users who want to reduce takeaways and cook simple, affordable meals with guided support.
 
+## Live Beta
+
+Open Cookr here:
+
+[https://johnfinnertynz.github.io/Cookr/](https://johnfinnertynz.github.io/Cookr/)
+
+Install on a phone:
+- iPhone: open the link in Safari, tap Share, then Add to Home Screen.
+- Android: open the link in Chrome, open the menu, then Add to Home screen or Install app.
+
 ## Stack
 - React 19
 - TypeScript
