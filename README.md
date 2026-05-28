@@ -2,6 +2,8 @@
 
 Cookr is an MVP cooking assistant for New Zealand users who want to reduce takeaways and cook simple, affordable meals with guided support.
 
+Built by [John Finnerty](https://johnfinnerty.co.nz), a software developer and tech consultant based in Christchurch, New Zealand. More project and contact context is available at [finnerty.me](https://finnerty.me).
+
 ## Live Beta
 
 Open Cookr here:
