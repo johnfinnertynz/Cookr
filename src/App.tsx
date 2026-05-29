@@ -895,6 +895,9 @@ function App() {
                 <p key={ingredient}><strong>{ingredient}</strong><span>{swaps.join(', ')}</span></p>
               ))}
             </div>
+            <p className="project-note">
+              Project context: <a href="https://www.johnfinnerty.co.nz/projects/cookr.html">Cookr case study</a>
+            </p>
           </section>
         )}
       </main>
